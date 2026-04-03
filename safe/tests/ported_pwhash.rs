@@ -371,3 +371,95 @@ fn aes256gcm_availability_contract_and_vectors_match_upstream() {
     );
     assert_eq!(afternm_plaintext, message);
 }
+
+#[test]
+fn aes256gcm_detached_in_place_round_trip_preserves_ciphertext_on_auth_failure() {
+    let init = core::sodium_init();
+    assert!(init == 0 || init == 1);
+
+    if aes256gcm::crypto_aead_aes256gcm_is_available() == 0 {
+        return;
+    }
+
+    let key = hex_decode("92ace3e348cd821092cd921aa3546374299ab46209691bc28b8752d17f123c20");
+    let nonce = hex_decode("00112233445566778899aabb");
+    let ad = hex_decode("00000000ffffffff");
+    let message = hex_decode("00010203040506070809");
+
+    let mut in_place = message.clone();
+    let mut mac = [0u8; 16];
+    let mut maclen = 0u64;
+    let in_place_ptr = in_place.as_mut_ptr();
+    assert_eq!(
+        aes256gcm::crypto_aead_aes256gcm_encrypt_detached(
+            in_place_ptr,
+            mac.as_mut_ptr(),
+            &mut maclen,
+            in_place_ptr.cast_const(),
+            in_place.len() as u64,
+            ad.as_ptr(),
+            ad.len() as u64,
+            ptr::null(),
+            nonce.as_ptr(),
+            key.as_ptr(),
+        ),
+        0
+    );
+    assert_eq!(maclen, 16);
+    assert_ne!(in_place, message);
+
+    assert_eq!(
+        aes256gcm::crypto_aead_aes256gcm_decrypt_detached(
+            in_place_ptr,
+            ptr::null_mut(),
+            in_place_ptr.cast_const(),
+            in_place.len() as u64,
+            mac.as_ptr(),
+            ad.as_ptr(),
+            ad.len() as u64,
+            nonce.as_ptr(),
+            key.as_ptr(),
+        ),
+        0
+    );
+    assert_eq!(in_place, message);
+
+    let mut failed_buffer = {
+        let mut ciphertext = message.clone();
+        let ciphertext_ptr = ciphertext.as_mut_ptr();
+        assert_eq!(
+            aes256gcm::crypto_aead_aes256gcm_encrypt_detached(
+                ciphertext_ptr,
+                mac.as_mut_ptr(),
+                &mut maclen,
+                ciphertext_ptr.cast_const(),
+                ciphertext.len() as u64,
+                ad.as_ptr(),
+                ad.len() as u64,
+                ptr::null(),
+                nonce.as_ptr(),
+                key.as_ptr(),
+            ),
+            0
+        );
+        ciphertext
+    };
+    let expected_ciphertext = failed_buffer.clone();
+    let failed_ptr = failed_buffer.as_mut_ptr();
+    mac[0] ^= 0x80;
+    assert_eq!(
+        aes256gcm::crypto_aead_aes256gcm_decrypt_detached(
+            failed_ptr,
+            ptr::null_mut(),
+            failed_ptr.cast_const(),
+            failed_buffer.len() as u64,
+            mac.as_ptr(),
+            ad.as_ptr(),
+            ad.len() as u64,
+            nonce.as_ptr(),
+            key.as_ptr(),
+        ),
+        -1
+    );
+    assert_eq!(failed_buffer, expected_ciphertext);
+}

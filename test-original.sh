@@ -247,6 +247,17 @@ require_nonempty_file() {
   fi
 }
 
+require_identical_files() {
+  local left="$1"
+  local right="$2"
+
+  if ! cmp -s "$left" "$right"; then
+    printf 'expected identical files: %s %s\n' "$left" "$right" >&2
+    diff -u "$left" "$right" >&2 || true
+    exit 1
+  fi
+}
+
 require_regex_match() {
   local label="$1"
   local value="$2"
@@ -788,9 +799,13 @@ test_qtox() {
 
   require_contains /tmp/qtox.log "Loading settings from :/conf/qtox.ini"
   require_contains /tmp/qtox.log "commit:"
+  require_contains /tmp/qtox.log "Signal 2 received"
   [[ -d "$work/config/tox" ]] || die "qtox did not create its config directory"
   require_nonempty_file "$qtox_log"
   require_contains "$qtox_log" "commit:"
+  require_contains "$qtox_log" "Signal 2 received"
+  require_identical_files /tmp/qtox.log "$qtox_log"
+  archive_report_path qtox /tmp/qtox.log startup.log
   archive_report_path qtox "$qtox_log"
   echo "QTOX_PROFILE_OK"
 }

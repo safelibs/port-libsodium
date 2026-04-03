@@ -1,5 +1,7 @@
 use crate::abi::types::*;
-use crate::ffi::helpers::{copy_allow_overlap, opt_slice, opt_slice_mut, static_cstr, write_opt};
+use crate::ffi::helpers::{
+    copy_allow_overlap, opt_slice, opt_slice_mut, read_array, static_cstr, write_array, write_opt,
+};
 use crate::foundation::randombytes::fill_random_bytes;
 use blake2b_simd::Params as Blake2bParams;
 use core::ffi::{c_char, c_int};
@@ -58,16 +60,6 @@ fn len_to_usize(len: u64) -> usize {
 
 fn is_zero(bytes: &[u8]) -> bool {
     bytes.iter().all(|&byte| byte == 0)
-}
-
-unsafe fn read_array<const N: usize>(ptr: *const u8) -> [u8; N] {
-    let mut out = [0u8; N];
-    out.copy_from_slice(opt_slice(ptr, N));
-    out
-}
-
-unsafe fn write_array<const N: usize>(ptr: *mut u8, bytes: &[u8; N]) {
-    opt_slice_mut(ptr, N).copy_from_slice(bytes);
 }
 
 fn clamp_ed25519_scalar(mut bytes: [u8; 32]) -> [u8; 32] {

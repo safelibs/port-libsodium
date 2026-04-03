@@ -12,7 +12,8 @@ usage: $(basename "$0") [--report-dir <dir>] [--mode safe|original] [--only <pac
 
 Runs the dependent compatibility matrix through test-original.sh and writes a
 deterministic report ledger under the requested report directory. In safe mode,
-the default report directory is safe/compat-reports/dependents/.
+the default report directory is safe/compat-reports/dependents/ for a full
+matrix run and safe/compat-reports/dependents-rerun/ when --from-list is used.
 EOF
 }
 
@@ -36,7 +37,11 @@ resolve_report_dir() {
 default_report_dir() {
   case "$mode" in
     safe)
-      printf '%s/compat-reports/dependents\n' "$safe_dir"
+      if [[ -n "$from_list" ]]; then
+        printf '%s/compat-reports/dependents-rerun\n' "$safe_dir"
+      else
+        printf '%s/compat-reports/dependents\n' "$safe_dir"
+      fi
       ;;
     original)
       die "missing required --report-dir in original mode"

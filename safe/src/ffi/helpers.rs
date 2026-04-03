@@ -47,6 +47,18 @@ pub unsafe fn opt_slice_mut<'a, T>(ptr: *mut T, len: usize) -> &'a mut [T] {
     }
 }
 
+/// SAFETY: `ptr` must be valid for `N` bytes for the duration of the copy.
+pub unsafe fn read_array<const N: usize>(ptr: *const u8) -> [u8; N] {
+    let mut out = [0u8; N];
+    out.copy_from_slice(opt_slice(ptr, N));
+    out
+}
+
+/// SAFETY: `ptr` must be valid for `N` bytes and writable for the duration of the copy.
+pub unsafe fn write_array<const N: usize>(ptr: *mut u8, bytes: &[u8; N]) {
+    opt_slice_mut(ptr, N).copy_from_slice(bytes);
+}
+
 /// SAFETY: `src` and `dst` must be valid for `len` bytes. Overlap is allowed.
 pub unsafe fn copy_allow_overlap(dst: *mut u8, src: *const u8, len: usize) {
     if len != 0 {

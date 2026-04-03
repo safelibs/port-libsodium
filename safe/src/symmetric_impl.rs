@@ -54,8 +54,6 @@ const SECRETSTREAM_ABYTES: usize = 17;
 const SECRETSTREAM_HEADERBYTES: usize = 24;
 const SECRETSTREAM_KEYBYTES: usize = 32;
 const SECRETSTREAM_STATEBYTES: usize = 52;
-const SECRETSTREAM_COUNTERBYTES: usize = 4;
-const SECRETSTREAM_INONCEBYTES: usize = 8;
 const SECRETSTREAM_TAG_MESSAGE: u8 = 0x00;
 const SECRETSTREAM_TAG_PUSH: u8 = 0x01;
 const SECRETSTREAM_TAG_REKEY: u8 = 0x02;
@@ -3502,6 +3500,27 @@ unsafe fn aes256gcm_require_available() -> c_int {
     0
 }
 
+unsafe fn aes256gcm_cipher_from_key(k: *const u8) -> aes_gcm::Aes256Gcm {
+    use aes_gcm::aead::KeyInit;
+
+    let key =
+        aes_gcm::Key::<aes_gcm::Aes256Gcm>::try_from(opt_slice(k, AES256GCM_KEYBYTES))
+            .expect("AES-256-GCM key length");
+    aes_gcm::Aes256Gcm::new(&key)
+}
+
+unsafe fn aes256gcm_nonce_from_ptr(
+    npub: *const u8,
+) -> aes_gcm::aead::Nonce<aes_gcm::Aes256Gcm> {
+    aes_gcm::aead::Nonce::<aes_gcm::Aes256Gcm>::try_from(opt_slice(npub, AES256GCM_NONCEBYTES))
+        .expect("AES-256-GCM nonce length")
+}
+
+unsafe fn aes256gcm_tag_from_ptr(mac: *const u8) -> aes_gcm::aead::Tag<aes_gcm::Aes256Gcm> {
+    aes_gcm::aead::Tag::<aes_gcm::Aes256Gcm>::try_from(opt_slice(mac, AEAD_ABYTES))
+        .expect("AES-256-GCM tag length")
+}
+
 pub unsafe fn crypto_aead_aes256gcm_beforenm(
     ctx_: *mut crypto_aead_aes256gcm_state,
     k: *const u8,
@@ -3600,14 +3619,14 @@ pub unsafe fn crypto_aead_aes256gcm_decrypt_detached(
     if clen > AES256GCM_MESSAGEBYTES_MAX as u64 {
         crate::foundation::core::sodium_misuse();
     }
-    use aes_gcm::aead::{AeadInPlace, KeyInit};
-    let key = aes_gcm::Key::<aes_gcm::Aes256Gcm>::from_slice(opt_slice(k, AES256GCM_KEYBYTES));
-    let cipher = aes_gcm::Aes256Gcm::new(key);
-    let nonce = aes_gcm::Nonce::from_slice(opt_slice(npub, AES256GCM_NONCEBYTES));
-    let tag = aes_gcm::Tag::from_slice(opt_slice(mac, 16));
+    use aes_gcm::aead::AeadInOut;
+
+    let cipher = aes256gcm_cipher_from_key(k);
+    let nonce = aes256gcm_nonce_from_ptr(npub);
+    let tag = aes256gcm_tag_from_ptr(mac);
     let out = copy_or_in_place(m, c, len_to_usize(clen));
     cipher
-        .decrypt_in_place_detached(nonce, opt_slice(ad, len_to_usize(adlen)), out, tag)
+        .decrypt_inout_detached(&nonce, opt_slice(ad, len_to_usize(adlen)), out.into(), &tag)
         .map(|_| 0)
         .unwrap_or(-1)
 }
@@ -3716,15 +3735,15 @@ pub unsafe fn crypto_aead_aes256gcm_encrypt_detached(
     if mlen > AES256GCM_MESSAGEBYTES_MAX as u64 {
         crate::foundation::core::sodium_misuse();
     }
-    use aes_gcm::aead::{AeadInPlace, KeyInit};
-    let key = aes_gcm::Key::<aes_gcm::Aes256Gcm>::from_slice(opt_slice(k, AES256GCM_KEYBYTES));
-    let cipher = aes_gcm::Aes256Gcm::new(key);
-    let nonce = aes_gcm::Nonce::from_slice(opt_slice(npub, AES256GCM_NONCEBYTES));
+    use aes_gcm::aead::AeadInOut;
+
+    let cipher = aes256gcm_cipher_from_key(k);
+    let nonce = aes256gcm_nonce_from_ptr(npub);
     let out = copy_or_in_place(c, m, len_to_usize(mlen));
-    match cipher.encrypt_in_place_detached(nonce, opt_slice(ad, len_to_usize(adlen)), out) {
+    match cipher.encrypt_inout_detached(&nonce, opt_slice(ad, len_to_usize(adlen)), out.into()) {
         Ok(tag) => {
-            opt_slice_mut(mac, 16).copy_from_slice(tag.as_ref());
-            write_opt(maclen_p, 16);
+            opt_slice_mut(mac, AEAD_ABYTES).copy_from_slice(tag.as_ref());
+            write_opt(maclen_p, AEAD_ABYTES as u64);
             0
         }
         Err(_) => -1,

@@ -7,17 +7,22 @@ repo_dir=$(cd -- "$safe_dir/.." && pwd)
 
 usage() {
   cat <<EOF
-usage: $(basename "$0") [--only <package>] [--report-dir <dir>]
+usage: $(basename "$0") [--only <package>] [--report-dir <dir>] [--rerun-from-list <file>] [--rerun-report-dir <dir>] [--skip-rerun]
 
 Builds the safe Debian packages, verifies the full exported symbol set,
 re-runs all 77 legacy source-compat and relinked-object tests, and then
-executes the dependent smoke harness in --mode safe. The default report
-directory is safe/compat-reports/dependents/.
+executes the dependent smoke harness in --mode safe. Unless --skip-rerun is
+set, it then reruns the selected dependent failure list into the rerun ledger.
+The default report directories are safe/compat-reports/dependents/ and
+safe/compat-reports/dependents-rerun/.
 EOF
 }
 
 only_args=()
 report_dir=""
+rerun_from_list="$safe_dir/compat-reports/dependents/failures.list"
+rerun_report_dir="$safe_dir/compat-reports/dependents-rerun"
+skip_rerun=0
 
 while (($#)); do
   case "$1" in
@@ -28,6 +33,18 @@ while (($#)); do
     --report-dir)
       report_dir="${2:?missing value for --report-dir}"
       shift 2
+      ;;
+    --rerun-from-list)
+      rerun_from_list="${2:?missing value for --rerun-from-list}"
+      shift 2
+      ;;
+    --rerun-report-dir)
+      rerun_report_dir="${2:?missing value for --rerun-report-dir}"
+      shift 2
+      ;;
+    --skip-rerun)
+      skip_rerun=1
+      shift
       ;;
     --help|-h)
       usage
@@ -148,3 +165,11 @@ fi
   --mode safe \
   --report-dir "$report_dir" \
   "${only_args[@]}"
+
+if [[ "$skip_rerun" != "1" ]]; then
+  log_step "Rerunning selected dependent failures"
+  "$safe_dir/tools/run-dependent-matrix.sh" \
+    --mode safe \
+    --from-list "$rerun_from_list" \
+    --report-dir "$rerun_report_dir"
+fi
