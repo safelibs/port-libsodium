@@ -4,14 +4,14 @@ use crate::ffi::helpers::abort_on_panic;
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_abytes() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_abytes()
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_abytes()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_headerbytes() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_headerbytes()
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_headerbytes()
     })
 }
 
@@ -22,7 +22,7 @@ pub extern "C" fn crypto_secretstream_xchacha20poly1305_init_pull(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_init_pull(state, header, k)
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_init_pull(state, header, k)
     })
 }
 
@@ -33,28 +33,28 @@ pub extern "C" fn crypto_secretstream_xchacha20poly1305_init_push(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_init_push(state, header, k)
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_init_push(state, header, k)
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_keybytes() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_keybytes()
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_keybytes()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_keygen(k);
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_messagebytes_max() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_messagebytes_max()
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_messagebytes_max()
     })
 }
 
@@ -70,8 +70,9 @@ pub extern "C" fn crypto_secretstream_xchacha20poly1305_pull(
     adlen: ::std::os::raw::c_ulonglong,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_secretstream_xchacha20poly1305_pull(state, m, mlen_p, tag_p, c, clen, ad, adlen)
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_pull(
+            state, m, mlen_p, tag_p, c, clen, ad, adlen,
+        )
     })
 }
 
@@ -87,8 +88,9 @@ pub extern "C" fn crypto_secretstream_xchacha20poly1305_push(
     tag: ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_secretstream_xchacha20poly1305_push(state, c, clen_p, m, mlen, ad, adlen, tag)
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_push(
+            state, c, clen_p, m, mlen, ad, adlen, tag,
+        )
     })
 }
 
@@ -97,41 +99,41 @@ pub extern "C" fn crypto_secretstream_xchacha20poly1305_rekey(
     state: *mut crypto_secretstream_xchacha20poly1305_state,
 ) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_rekey(state);
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_rekey(state);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_statebytes() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_statebytes()
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_statebytes()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_tag_final() -> ::std::os::raw::c_uchar {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_tag_final()
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_tag_final()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_tag_message() -> ::std::os::raw::c_uchar {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_tag_message()
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_tag_message()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_tag_push() -> ::std::os::raw::c_uchar {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_tag_push()
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_tag_push()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_secretstream_xchacha20poly1305_tag_rekey() -> ::std::os::raw::c_uchar {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_secretstream_xchacha20poly1305_tag_rekey()
+        crate::symmetric_impl::crypto_secretstream_xchacha20poly1305_tag_rekey()
     })
 }

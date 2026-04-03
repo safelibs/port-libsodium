@@ -7,27 +7,27 @@ pub extern "C" fn crypto_core_salsa20(
     k: *const ::std::os::raw::c_uchar,
     c: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_core_salsa20(out, in_, k, c) })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa20(out, in_, k, c) })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa20_constbytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_core_salsa20_constbytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa20_constbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa20_inputbytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_core_salsa20_inputbytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa20_inputbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa20_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_core_salsa20_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa20_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa20_outputbytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_core_salsa20_outputbytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa20_outputbytes() })
 }
 
 #[no_mangle]
@@ -37,53 +37,27 @@ pub extern "C" fn crypto_core_salsa2012(
     k: *const ::std::os::raw::c_uchar,
     c: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe {
-        let f = crate::upstream::load().symbol::<unsafe extern "C" fn(
-            *mut ::std::os::raw::c_uchar,
-            *const ::std::os::raw::c_uchar,
-            *const ::std::os::raw::c_uchar,
-            *const ::std::os::raw::c_uchar,
-        ) -> ::std::os::raw::c_int>(
-            b"crypto_core_salsa2012\0"
-        );
-        f(out, in_, k, c)
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa2012(out, in_, k, c) })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa2012_constbytes() -> usize {
-    abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .symbol::<unsafe extern "C" fn() -> usize>(b"crypto_core_salsa2012_constbytes\0")(
-        )
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa2012_constbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa2012_inputbytes() -> usize {
-    abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .symbol::<unsafe extern "C" fn() -> usize>(b"crypto_core_salsa2012_inputbytes\0")(
-        )
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa2012_inputbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa2012_keybytes() -> usize {
-    abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .symbol::<unsafe extern "C" fn() -> usize>(b"crypto_core_salsa2012_keybytes\0")(
-        )
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa2012_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa2012_outputbytes() -> usize {
-    abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .symbol::<unsafe extern "C" fn() -> usize>(b"crypto_core_salsa2012_outputbytes\0")(
-        )
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa2012_outputbytes() })
 }
 
 #[no_mangle]
@@ -93,50 +67,25 @@ pub extern "C" fn crypto_core_salsa208(
     k: *const ::std::os::raw::c_uchar,
     c: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe {
-        let f = crate::upstream::load().symbol::<unsafe extern "C" fn(
-            *mut ::std::os::raw::c_uchar,
-            *const ::std::os::raw::c_uchar,
-            *const ::std::os::raw::c_uchar,
-            *const ::std::os::raw::c_uchar,
-        ) -> ::std::os::raw::c_int>(
-            b"crypto_core_salsa208\0"
-        );
-        f(out, in_, k, c)
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa208(out, in_, k, c) })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa208_constbytes() -> usize {
-    abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .symbol::<unsafe extern "C" fn() -> usize>(b"crypto_core_salsa208_constbytes\0")(
-        )
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa208_constbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa208_inputbytes() -> usize {
-    abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .symbol::<unsafe extern "C" fn() -> usize>(b"crypto_core_salsa208_inputbytes\0")(
-        )
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa208_inputbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa208_keybytes() -> usize {
-    abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .symbol::<unsafe extern "C" fn() -> usize>(b"crypto_core_salsa208_keybytes\0")()
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa208_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_core_salsa208_outputbytes() -> usize {
-    abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .symbol::<unsafe extern "C" fn() -> usize>(b"crypto_core_salsa208_outputbytes\0")(
-        )
-    })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_core_salsa208_outputbytes() })
 }

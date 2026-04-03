@@ -7,7 +7,7 @@ pub extern "C" fn crypto_stream_chacha20(
     n: *const ::std::os::raw::c_uchar,
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_chacha20(c, clen, n, k) })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_chacha20(c, clen, n, k) })
 }
 
 #[no_mangle]
@@ -17,31 +17,31 @@ pub extern "C" fn crypto_stream_chacha20_ietf(
     n: *const ::std::os::raw::c_uchar,
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_chacha20_ietf(c, clen, n, k) })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_chacha20_ietf(c, clen, n, k) })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_chacha20_ietf_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_chacha20_ietf_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_chacha20_ietf_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_chacha20_ietf_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_chacha20_ietf_keygen(k);
+        crate::symmetric_impl::crypto_stream_chacha20_ietf_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_chacha20_ietf_messagebytes_max() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_chacha20_ietf_messagebytes_max()
+        crate::symmetric_impl::crypto_stream_chacha20_ietf_messagebytes_max()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_chacha20_ietf_noncebytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_chacha20_ietf_noncebytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_chacha20_ietf_noncebytes() })
 }
 
 #[no_mangle]
@@ -53,7 +53,7 @@ pub extern "C" fn crypto_stream_chacha20_ietf_xor(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_chacha20_ietf_xor(c, m, mlen, n, k)
+        crate::symmetric_impl::crypto_stream_chacha20_ietf_xor(c, m, mlen, n, k)
     })
 }
 
@@ -67,30 +67,30 @@ pub extern "C" fn crypto_stream_chacha20_ietf_xor_ic(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_chacha20_ietf_xor_ic(c, m, mlen, n, ic, k)
+        crate::symmetric_impl::crypto_stream_chacha20_ietf_xor_ic(c, m, mlen, n, ic, k)
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_chacha20_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_chacha20_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_chacha20_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_chacha20_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_chacha20_keygen(k);
+        crate::symmetric_impl::crypto_stream_chacha20_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_chacha20_messagebytes_max() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_chacha20_messagebytes_max() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_chacha20_messagebytes_max() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_chacha20_noncebytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_chacha20_noncebytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_chacha20_noncebytes() })
 }
 
 #[no_mangle]
@@ -102,7 +102,7 @@ pub extern "C" fn crypto_stream_chacha20_xor(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_chacha20_xor(c, m, mlen, n, k)
+        crate::symmetric_impl::crypto_stream_chacha20_xor(c, m, mlen, n, k)
     })
 }
 
@@ -116,6 +116,6 @@ pub extern "C" fn crypto_stream_chacha20_xor_ic(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_chacha20_xor_ic(c, m, mlen, n, ic, k)
+        crate::symmetric_impl::crypto_stream_chacha20_xor_ic(c, m, mlen, n, ic, k)
     })
 }

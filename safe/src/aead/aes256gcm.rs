@@ -3,7 +3,7 @@ use crate::ffi::helpers::abort_on_panic;
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_aes256gcm_abytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_aes256gcm_abytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_aes256gcm_abytes() })
 }
 
 #[no_mangle]
@@ -11,7 +11,7 @@ pub extern "C" fn crypto_aead_aes256gcm_beforenm(
     ctx_: *mut crypto_aead_aes256gcm_state,
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_aes256gcm_beforenm(ctx_, k) })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_aes256gcm_beforenm(ctx_, k) })
 }
 
 #[no_mangle]
@@ -27,8 +27,9 @@ pub extern "C" fn crypto_aead_aes256gcm_decrypt(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_aead_aes256gcm_decrypt(m, mlen_p, nsec, c, clen, ad, adlen, npub, k)
+        crate::symmetric_impl::crypto_aead_aes256gcm_decrypt(
+            m, mlen_p, nsec, c, clen, ad, adlen, npub, k,
+        )
     })
 }
 
@@ -45,8 +46,9 @@ pub extern "C" fn crypto_aead_aes256gcm_decrypt_afternm(
     ctx_: *const crypto_aead_aes256gcm_state,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_aead_aes256gcm_decrypt_afternm(m, mlen_p, nsec, c, clen, ad, adlen, npub, ctx_)
+        crate::symmetric_impl::crypto_aead_aes256gcm_decrypt_afternm(
+            m, mlen_p, nsec, c, clen, ad, adlen, npub, ctx_,
+        )
     })
 }
 
@@ -63,8 +65,9 @@ pub extern "C" fn crypto_aead_aes256gcm_decrypt_detached(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_aead_aes256gcm_decrypt_detached(m, nsec, c, clen, mac, ad, adlen, npub, k)
+        crate::symmetric_impl::crypto_aead_aes256gcm_decrypt_detached(
+            m, nsec, c, clen, mac, ad, adlen, npub, k,
+        )
     })
 }
 
@@ -81,7 +84,7 @@ pub extern "C" fn crypto_aead_aes256gcm_decrypt_detached_afternm(
     ctx_: *const crypto_aead_aes256gcm_state,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_aes256gcm_decrypt_detached_afternm(
+        crate::symmetric_impl::crypto_aead_aes256gcm_decrypt_detached_afternm(
             m, nsec, c, clen, mac, ad, adlen, npub, ctx_,
         )
     })
@@ -100,8 +103,9 @@ pub extern "C" fn crypto_aead_aes256gcm_encrypt(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_aead_aes256gcm_encrypt(c, clen_p, m, mlen, ad, adlen, nsec, npub, k)
+        crate::symmetric_impl::crypto_aead_aes256gcm_encrypt(
+            c, clen_p, m, mlen, ad, adlen, nsec, npub, k,
+        )
     })
 }
 
@@ -118,8 +122,9 @@ pub extern "C" fn crypto_aead_aes256gcm_encrypt_afternm(
     ctx_: *const crypto_aead_aes256gcm_state,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_aead_aes256gcm_encrypt_afternm(c, clen_p, m, mlen, ad, adlen, nsec, npub, ctx_)
+        crate::symmetric_impl::crypto_aead_aes256gcm_encrypt_afternm(
+            c, clen_p, m, mlen, ad, adlen, nsec, npub, ctx_,
+        )
     })
 }
 
@@ -137,7 +142,7 @@ pub extern "C" fn crypto_aead_aes256gcm_encrypt_detached(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_aes256gcm_encrypt_detached(
+        crate::symmetric_impl::crypto_aead_aes256gcm_encrypt_detached(
             c, mac, maclen_p, m, mlen, ad, adlen, nsec, npub, k,
         )
     })
@@ -157,7 +162,7 @@ pub extern "C" fn crypto_aead_aes256gcm_encrypt_detached_afternm(
     ctx_: *const crypto_aead_aes256gcm_state,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_aes256gcm_encrypt_detached_afternm(
+        crate::symmetric_impl::crypto_aead_aes256gcm_encrypt_detached_afternm(
             c, mac, maclen_p, m, mlen, ad, adlen, nsec, npub, ctx_,
         )
     })
@@ -165,37 +170,37 @@ pub extern "C" fn crypto_aead_aes256gcm_encrypt_detached_afternm(
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_aes256gcm_is_available() -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_aes256gcm_is_available() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_aes256gcm_is_available() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_aes256gcm_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_aes256gcm_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_aes256gcm_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_aes256gcm_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_aes256gcm_keygen(k);
+        crate::symmetric_impl::crypto_aead_aes256gcm_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_aes256gcm_messagebytes_max() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_aes256gcm_messagebytes_max() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_aes256gcm_messagebytes_max() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_aes256gcm_npubbytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_aes256gcm_npubbytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_aes256gcm_npubbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_aes256gcm_nsecbytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_aes256gcm_nsecbytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_aes256gcm_nsecbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_aes256gcm_statebytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_aes256gcm_statebytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_aes256gcm_statebytes() })
 }

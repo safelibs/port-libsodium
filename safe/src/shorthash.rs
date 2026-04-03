@@ -7,29 +7,29 @@ pub extern "C" fn crypto_shorthash(
     inlen: ::std::os::raw::c_ulonglong,
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_shorthash(out, in_, inlen, k) })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_shorthash(out, in_, inlen, k) })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_shorthash_bytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_shorthash_bytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_shorthash_bytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_shorthash_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_shorthash_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_shorthash_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_shorthash_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_shorthash_keygen(k);
+        crate::symmetric_impl::crypto_shorthash_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_shorthash_primitive() -> *const ::std::os::raw::c_char {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_shorthash_primitive() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_shorthash_primitive() })
 }
 
 #[no_mangle]
@@ -40,18 +40,18 @@ pub extern "C" fn crypto_shorthash_siphash24(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_shorthash_siphash24(out, in_, inlen, k)
+        crate::symmetric_impl::crypto_shorthash_siphash24(out, in_, inlen, k)
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_shorthash_siphash24_bytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_shorthash_siphash24_bytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_shorthash_siphash24_bytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_shorthash_siphash24_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_shorthash_siphash24_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_shorthash_siphash24_keybytes() })
 }
 
 #[no_mangle]
@@ -62,16 +62,16 @@ pub extern "C" fn crypto_shorthash_siphashx24(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_shorthash_siphashx24(out, in_, inlen, k)
+        crate::symmetric_impl::crypto_shorthash_siphashx24(out, in_, inlen, k)
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_shorthash_siphashx24_bytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_shorthash_siphashx24_bytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_shorthash_siphashx24_bytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_shorthash_siphashx24_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_shorthash_siphashx24_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_shorthash_siphashx24_keybytes() })
 }

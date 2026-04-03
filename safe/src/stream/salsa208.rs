@@ -7,29 +7,29 @@ pub extern "C" fn crypto_stream_salsa208(
     n: *const ::std::os::raw::c_uchar,
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_salsa208(c, clen, n, k) })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_salsa208(c, clen, n, k) })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_salsa208_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_salsa208_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_salsa208_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_salsa208_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_salsa208_keygen(k);
+        crate::symmetric_impl::crypto_stream_salsa208_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_salsa208_messagebytes_max() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_salsa208_messagebytes_max() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_salsa208_messagebytes_max() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_salsa208_noncebytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_salsa208_noncebytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_salsa208_noncebytes() })
 }
 
 #[no_mangle]
@@ -41,6 +41,6 @@ pub extern "C" fn crypto_stream_salsa208_xor(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_salsa208_xor(c, m, mlen, n, k)
+        crate::symmetric_impl::crypto_stream_salsa208_xor(c, m, mlen, n, k)
     })
 }

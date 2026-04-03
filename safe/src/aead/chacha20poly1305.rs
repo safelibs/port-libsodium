@@ -2,7 +2,7 @@ use crate::ffi::helpers::abort_on_panic;
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_abytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_chacha20poly1305_abytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_chacha20poly1305_abytes() })
 }
 
 #[no_mangle]
@@ -18,8 +18,9 @@ pub extern "C" fn crypto_aead_chacha20poly1305_decrypt(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_aead_chacha20poly1305_decrypt(m, mlen_p, nsec, c, clen, ad, adlen, npub, k)
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_decrypt(
+            m, mlen_p, nsec, c, clen, ad, adlen, npub, k,
+        )
     })
 }
 
@@ -36,7 +37,7 @@ pub extern "C" fn crypto_aead_chacha20poly1305_decrypt_detached(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_decrypt_detached(
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_decrypt_detached(
             m, nsec, c, clen, mac, ad, adlen, npub, k,
         )
     })
@@ -55,8 +56,9 @@ pub extern "C" fn crypto_aead_chacha20poly1305_encrypt(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_aead_chacha20poly1305_encrypt(c, clen_p, m, mlen, ad, adlen, nsec, npub, k)
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_encrypt(
+            c, clen_p, m, mlen, ad, adlen, nsec, npub, k,
+        )
     })
 }
 
@@ -74,7 +76,7 @@ pub extern "C" fn crypto_aead_chacha20poly1305_encrypt_detached(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_encrypt_detached(
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_encrypt_detached(
             c, mac, maclen_p, m, mlen, ad, adlen, nsec, npub, k,
         )
     })
@@ -82,7 +84,7 @@ pub extern "C" fn crypto_aead_chacha20poly1305_encrypt_detached(
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_ietf_abytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_chacha20poly1305_ietf_abytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_abytes() })
 }
 
 #[no_mangle]
@@ -98,8 +100,9 @@ pub extern "C" fn crypto_aead_chacha20poly1305_ietf_decrypt(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_aead_chacha20poly1305_ietf_decrypt(m, mlen_p, nsec, c, clen, ad, adlen, npub, k)
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_decrypt(
+            m, mlen_p, nsec, c, clen, ad, adlen, npub, k,
+        )
     })
 }
 
@@ -116,7 +119,7 @@ pub extern "C" fn crypto_aead_chacha20poly1305_ietf_decrypt_detached(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_ietf_decrypt_detached(
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_decrypt_detached(
             m, nsec, c, clen, mac, ad, adlen, npub, k,
         )
     })
@@ -135,8 +138,9 @@ pub extern "C" fn crypto_aead_chacha20poly1305_ietf_encrypt(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load()
-            .crypto_aead_chacha20poly1305_ietf_encrypt(c, clen_p, m, mlen, ad, adlen, nsec, npub, k)
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_encrypt(
+            c, clen_p, m, mlen, ad, adlen, nsec, npub, k,
+        )
     })
 }
 
@@ -154,7 +158,7 @@ pub extern "C" fn crypto_aead_chacha20poly1305_ietf_encrypt_detached(
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_ietf_encrypt_detached(
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_encrypt_detached(
             c, mac, maclen_p, m, mlen, ad, adlen, nsec, npub, k,
         )
     })
@@ -163,63 +167,63 @@ pub extern "C" fn crypto_aead_chacha20poly1305_ietf_encrypt_detached(
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_ietf_keybytes() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_ietf_keybytes()
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_keybytes()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_ietf_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_ietf_keygen(k);
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_ietf_messagebytes_max() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_ietf_messagebytes_max()
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_messagebytes_max()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_ietf_npubbytes() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_ietf_npubbytes()
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_npubbytes()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_ietf_nsecbytes() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_ietf_nsecbytes()
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_ietf_nsecbytes()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_chacha20poly1305_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_chacha20poly1305_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_keygen(k);
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_messagebytes_max() -> usize {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_aead_chacha20poly1305_messagebytes_max()
+        crate::symmetric_impl::crypto_aead_chacha20poly1305_messagebytes_max()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_npubbytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_chacha20poly1305_npubbytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_chacha20poly1305_npubbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_aead_chacha20poly1305_nsecbytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_aead_chacha20poly1305_nsecbytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_aead_chacha20poly1305_nsecbytes() })
 }

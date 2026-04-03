@@ -2,7 +2,7 @@
 
 pub mod abi;
 pub mod ffi;
-mod upstream;
+mod symmetric_impl;
 
 pub mod foundation {
     pub mod codecs;

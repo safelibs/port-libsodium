@@ -9,8 +9,19 @@ name = "sodium"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
+aead = "0.6.0-rc.2"
+aes-gcm = "0.11.0-rc.3"
+argon2 = "0.6.0-rc.8"
+base64 = "0.22"
+blake2b_simd = "1.0.4"
+chacha20 = { version = "0.10.0", features = ["legacy", "xchacha"] }
+chacha20poly1305 = "0.11.0-rc.3"
 libc = "0.2"
-libloading = "0.8"
+poly1305 = "0.9.0-rc.6"
+sha2 = "0.11.0"
+salsa20 = "0.11.0"
+siphasher = "1.0.2"
+subtle = "2.6"
 
 [build-dependencies]
 cc = "1"

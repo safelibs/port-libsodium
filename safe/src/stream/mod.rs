@@ -13,34 +13,34 @@ pub extern "C" fn crypto_stream(
     n: *const ::std::os::raw::c_uchar,
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream(c, clen, n, k) })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream(c, clen, n, k) })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_stream_keygen(k);
+        crate::symmetric_impl::crypto_stream_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_messagebytes_max() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_messagebytes_max() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_messagebytes_max() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_noncebytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_noncebytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_noncebytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_stream_primitive() -> *const ::std::os::raw::c_char {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_primitive() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_primitive() })
 }
 
 #[no_mangle]
@@ -51,5 +51,5 @@ pub extern "C" fn crypto_stream_xor(
     n: *const ::std::os::raw::c_uchar,
     k: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_stream_xor(c, m, mlen, n, k) })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_stream_xor(c, m, mlen, n, k) })
 }

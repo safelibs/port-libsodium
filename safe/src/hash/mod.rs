@@ -8,15 +8,15 @@ pub extern "C" fn crypto_hash(
     in_: *const ::std::os::raw::c_uchar,
     inlen: ::std::os::raw::c_ulonglong,
 ) -> ::std::os::raw::c_int {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_hash(out, in_, inlen) })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_hash(out, in_, inlen) })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_hash_bytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_hash_bytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_hash_bytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_hash_primitive() -> *const ::std::os::raw::c_char {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_hash_primitive() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_hash_primitive() })
 }

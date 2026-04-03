@@ -11,7 +11,7 @@ pub extern "C" fn crypto_generichash(
     keylen: usize,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash(out, outlen, in_, inlen, key, keylen)
+        crate::symmetric_impl::crypto_generichash(out, outlen, in_, inlen, key, keylen)
     })
 }
 
@@ -25,23 +25,23 @@ pub extern "C" fn crypto_generichash_blake2b(
     keylen: usize,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_blake2b(out, outlen, in_, inlen, key, keylen)
+        crate::symmetric_impl::crypto_generichash_blake2b(out, outlen, in_, inlen, key, keylen)
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_bytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_blake2b_bytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_blake2b_bytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_bytes_max() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_blake2b_bytes_max() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_blake2b_bytes_max() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_bytes_min() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_blake2b_bytes_min() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_blake2b_bytes_min() })
 }
 
 #[no_mangle]
@@ -51,7 +51,7 @@ pub extern "C" fn crypto_generichash_blake2b_final(
     outlen: usize,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_blake2b_final(state, out, outlen)
+        crate::symmetric_impl::crypto_generichash_blake2b_final(state, out, outlen)
     })
 }
 
@@ -63,7 +63,7 @@ pub extern "C" fn crypto_generichash_blake2b_init(
     outlen: usize,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_blake2b_init(state, key, keylen, outlen)
+        crate::symmetric_impl::crypto_generichash_blake2b_init(state, key, keylen, outlen)
     })
 }
 
@@ -77,7 +77,7 @@ pub extern "C" fn crypto_generichash_blake2b_init_salt_personal(
     personal: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_blake2b_init_salt_personal(
+        crate::symmetric_impl::crypto_generichash_blake2b_init_salt_personal(
             state, key, keylen, outlen, salt, personal,
         )
     })
@@ -85,29 +85,29 @@ pub extern "C" fn crypto_generichash_blake2b_init_salt_personal(
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_blake2b_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_blake2b_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_keybytes_max() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_blake2b_keybytes_max() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_blake2b_keybytes_max() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_keybytes_min() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_blake2b_keybytes_min() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_blake2b_keybytes_min() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_blake2b_keygen(k);
+        crate::symmetric_impl::crypto_generichash_blake2b_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_personalbytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_blake2b_personalbytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_blake2b_personalbytes() })
 }
 
 #[no_mangle]
@@ -122,7 +122,7 @@ pub extern "C" fn crypto_generichash_blake2b_salt_personal(
     personal: *const ::std::os::raw::c_uchar,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_blake2b_salt_personal(
+        crate::symmetric_impl::crypto_generichash_blake2b_salt_personal(
             out, outlen, in_, inlen, key, keylen, salt, personal,
         )
     })
@@ -130,12 +130,12 @@ pub extern "C" fn crypto_generichash_blake2b_salt_personal(
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_saltbytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_blake2b_saltbytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_blake2b_saltbytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_blake2b_statebytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_blake2b_statebytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_blake2b_statebytes() })
 }
 
 #[no_mangle]
@@ -145,23 +145,23 @@ pub extern "C" fn crypto_generichash_blake2b_update(
     inlen: ::std::os::raw::c_ulonglong,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_blake2b_update(state, in_, inlen)
+        crate::symmetric_impl::crypto_generichash_blake2b_update(state, in_, inlen)
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_bytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_bytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_bytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_bytes_max() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_bytes_max() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_bytes_max() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_bytes_min() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_bytes_min() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_bytes_min() })
 }
 
 #[no_mangle]
@@ -171,7 +171,7 @@ pub extern "C" fn crypto_generichash_final(
     outlen: usize,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_final(state, out, outlen)
+        crate::symmetric_impl::crypto_generichash_final(state, out, outlen)
     })
 }
 
@@ -183,40 +183,40 @@ pub extern "C" fn crypto_generichash_init(
     outlen: usize,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_init(state, key, keylen, outlen)
+        crate::symmetric_impl::crypto_generichash_init(state, key, keylen, outlen)
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_keybytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_keybytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_keybytes() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_keybytes_max() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_keybytes_max() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_keybytes_max() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_keybytes_min() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_keybytes_min() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_keybytes_min() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_keygen(k: *mut ::std::os::raw::c_uchar) {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_keygen(k);
+        crate::symmetric_impl::crypto_generichash_keygen(k);
     })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_primitive() -> *const ::std::os::raw::c_char {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_primitive() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_primitive() })
 }
 
 #[no_mangle]
 pub extern "C" fn crypto_generichash_statebytes() -> usize {
-    abort_on_panic(|| unsafe { crate::upstream::load().crypto_generichash_statebytes() })
+    abort_on_panic(|| unsafe { crate::symmetric_impl::crypto_generichash_statebytes() })
 }
 
 #[no_mangle]
@@ -226,6 +226,6 @@ pub extern "C" fn crypto_generichash_update(
     inlen: ::std::os::raw::c_ulonglong,
 ) -> ::std::os::raw::c_int {
     abort_on_panic(|| unsafe {
-        crate::upstream::load().crypto_generichash_update(state, in_, inlen)
+        crate::symmetric_impl::crypto_generichash_update(state, in_, inlen)
     })
 }
