@@ -34,18 +34,17 @@ randombytes_tests(void)
         0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
         0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
     };
+    static const uint32_t upper_bounds[] = {
+        2U, 3U, 255U, 256U, 257U, 1024U, 65535U, 0x80000000U
+    };
     unsigned char out[100];
+    unsigned char out2[100];
+    unsigned char seed2[randombytes_SEEDBYTES];
     unsigned int  f = 0U;
     unsigned int  i;
+    size_t        j;
     uint32_t      n;
 
-#ifndef BENCHMARKS
-# ifdef __EMSCRIPTEN__
-    assert(strcmp(randombytes_implementation_name(), "js") == 0);
-# else
-    assert(strcmp(randombytes_implementation_name(), "sysrandom") == 0);
-# endif
-#endif
     randombytes(x, 1U);
     do {
         n = randombytes_random();
@@ -70,11 +69,6 @@ randombytes_tests(void)
     }
     assert(randombytes_uniform(1U) == 0U);
     randombytes_close();
-#ifndef __EMSCRIPTEN__
-    assert(&randombytes_internal_implementation == &randombytes_salsa20_implementation);
-    randombytes_set_implementation(&randombytes_internal_implementation);
-    assert(strcmp(randombytes_implementation_name(), "internal") == 0);
-#endif
     randombytes_stir();
     for (i = 0; i < 256; ++i) {
         freq[i] = 0;
@@ -107,6 +101,12 @@ randombytes_tests(void)
         printf("%02x", out[i]);
     }
     printf(" (deterministic)\n");
+    randombytes_buf_deterministic(out2, sizeof out2, seed);
+    assert(memcmp(out, out2, sizeof out) == 0);
+    memcpy(seed2, seed, sizeof seed2);
+    seed2[0] ^= 1U;
+    randombytes_buf_deterministic(out2, sizeof out2, seed2);
+    assert(memcmp(out, out2, sizeof out) != 0);
 
     randombytes_close();
 
@@ -115,33 +115,9 @@ randombytes_tests(void)
 
     assert(randombytes_SEEDBYTES > 0);
     assert(randombytes_seedbytes() == randombytes_SEEDBYTES);
-
-    return 0;
-}
-
-static uint32_t
-randombytes_uniform_impl(const uint32_t upper_bound)
-{
-    return upper_bound;
-}
-
-static int
-impl_tests(void)
-{
-    randombytes_implementation impl = randombytes_sysrandom_implementation;
-    uint32_t                   v = randombytes_random();
-
-    impl.uniform = randombytes_uniform_impl;
-    randombytes_close();
-    randombytes_set_implementation(&impl);
-    assert(randombytes_uniform(1) == 1);
-    assert(randombytes_uniform(v) == v);
-    assert(randombytes_uniform(v) == v);
-    assert(randombytes_uniform(v) == v);
-    assert(randombytes_uniform(v) == v);
-    randombytes_close();
-    impl.close = NULL;
-    randombytes_close();
+    for (j = 0U; j < sizeof upper_bounds / sizeof upper_bounds[0]; j++) {
+        assert(randombytes_uniform(upper_bounds[j]) < upper_bounds[j]);
+    }
 
     return 0;
 }
@@ -151,14 +127,7 @@ main(void)
 {
     compat_tests();
     randombytes_tests();
-#ifndef __EMSCRIPTEN__
-    impl_tests();
-#endif
     printf("OK\n");
-
-#ifndef __EMSCRIPTEN__
-    randombytes_set_implementation(&randombytes_salsa20_implementation);
-#endif
 
     return 0;
 }
