@@ -4,6 +4,7 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 safe_dir=$(cd -- "$script_dir/.." && pwd)
 repo_dir=$(cd -- "$safe_dir/.." && pwd)
+image_tag="${LIBSODIUM_DEPENDENT_IMAGE:-${LIBSODIUM_ORIGINAL_TEST_IMAGE:-libsodium-original-test:ubuntu24.04}}"
 
 usage() {
   cat <<EOF
@@ -29,6 +30,24 @@ resolve_report_dir() {
   mkdir -p "$parent"
   parent="$(cd -- "$parent" && pwd)"
   printf '%s/%s\n' "$parent" "$base"
+}
+
+clear_report_dir() {
+  local report_dir="$1"
+  local host_uid
+  local host_gid
+
+  host_uid="$(id -u)"
+  host_gid="$(id -g)"
+
+  docker run --rm \
+    -v "$report_dir":/reports \
+    "$image_tag" \
+    bash -lc "
+      set -euo pipefail
+      find /reports -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      chown -R $host_uid:$host_gid /reports
+    "
 }
 
 mode="safe"
@@ -82,6 +101,8 @@ esac
 
 report_dir="$(resolve_report_dir "$report_dir")"
 mkdir -p "$report_dir"
+"$safe_dir/tools/build-dependent-image.sh" --tag "$image_tag"
+clear_report_dir "$report_dir"
 
 args=(
   --mode "$mode"
@@ -98,4 +119,4 @@ if [[ "$strict" == "1" ]]; then
   args+=(--strict)
 fi
 
-"$repo_dir/test-original.sh" "${args[@]}"
+LIBSODIUM_SKIP_IMAGE_BUILD=1 "$repo_dir/test-original.sh" "${args[@]}"
