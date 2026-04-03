@@ -52,34 +52,38 @@ parse_debian_symbols() {
 
 extract_header_exports() {
   awk '
-    function flush(    line, count, parts) {
-      gsub(/__attribute__[[:space:]]*\(\([^)]*\)\)/, " ", decl)
+    function flush(    line, token, count, parts) {
       gsub(/[[:space:]]+/, " ", decl)
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", decl)
       if (decl == "") {
         return
       }
-      if (decl ~ /^extern /) {
-        line = decl
+      line = decl
+      sub(/^[[:space:]]*SODIUM_EXPORT_WEAK[[:space:]]*/, "", line)
+      sub(/^[[:space:]]*SODIUM_EXPORT[[:space:]]*/, "", line)
+      sub(/[[:space:]]*__attribute__[[:space:]]*\(\(.*$/, "", line)
+      if (line ~ /^extern /) {
         sub(/;.*$/, "", line)
-        count = split(line, parts, /[[:space:]]+/)
-        if (count > 0) {
-          print parts[count]
-        }
-      } else {
-        line = decl
-        sub(/\(.*/, "", line)
         gsub(/\*/, " ", line)
         count = split(line, parts, /[[:space:]]+/)
         if (count > 0) {
           print parts[count]
         }
+      } else if (match(line, /[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(/)) {
+        token = substr(line, RSTART, RLENGTH)
+        sub(/[[:space:]]*\(.*/, "", token)
+        print token
       }
       decl = ""
     }
-    /SODIUM_EXPORT_WEAK/ || /SODIUM_EXPORT/ {
+    /^[[:space:]]*SODIUM_EXPORT_WEAK([[:space:]]|$)/ || /^[[:space:]]*SODIUM_EXPORT([[:space:]]|$)/ {
       capture = 1
-      decl = ""
+      decl = $0
+      sub(/^.*SODIUM_EXPORT(_WEAK)?[[:space:]]*/, "", decl)
+      if (decl ~ /;/) {
+        capture = 0
+        flush()
+      }
       next
     }
     capture {
