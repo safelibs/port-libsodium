@@ -2,6 +2,7 @@
 
 pub mod abi;
 pub mod ffi;
+mod upstream;
 
 pub mod foundation {
     pub mod codecs;
@@ -12,3 +13,16 @@ pub mod foundation {
     pub mod verify;
     pub mod version;
 }
+
+pub mod aead;
+pub mod auth;
+pub mod core;
+pub mod generichash;
+pub mod hash;
+pub mod kdf;
+pub mod onetimeauth;
+pub mod pwhash;
+pub mod secretbox;
+pub mod secretstream;
+pub mod shorthash;
+pub mod stream;

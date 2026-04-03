@@ -7,7 +7,7 @@ repo_dir=$(cd -- "$safe_dir/.." && pwd)
 orig_test_dir="$repo_dir/original/test/default"
 target_dir="$safe_dir/target/release"
 
-foundation_subset=(
+phase2_subset=(
   codecs
   randombytes
   sodium_core
@@ -16,6 +16,44 @@ foundation_subset=(
   sodium_utils3
   sodium_version
   verify1
+  hash
+  hash3
+  generichash
+  generichash2
+  generichash3
+  auth
+  auth2
+  auth3
+  auth5
+  auth6
+  auth7
+  onetimeauth
+  onetimeauth2
+  onetimeauth7
+  chacha20
+  stream
+  stream2
+  stream3
+  stream4
+  core1
+  core2
+  core3
+  core4
+  core5
+  core6
+  shorthash
+  siphashx24
+  secretbox
+  secretbox2
+  secretbox7
+  secretbox8
+  secretbox_easy
+  secretbox_easy2
+  secretstream
+  aead_chacha20poly1305
+  aead_chacha20poly13052
+  aead_xchacha20poly1305
+  metamorphic
 )
 
 active_test_inventory() {
@@ -78,7 +116,7 @@ select_tests() {
     return
   fi
 
-  printf '%s\n' "${foundation_subset[@]}"
+  printf '%s\n' "${phase2_subset[@]}"
 }
 
 [[ -f "$target_dir/libsodium.so" ]] || {

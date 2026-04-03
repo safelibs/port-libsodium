@@ -10,6 +10,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 libc = "0.2"
+libloading = "0.8"
 
 [build-dependencies]
 cc = "1"

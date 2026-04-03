@@ -13,10 +13,10 @@ fn run_checked(mut command: Command, context: &str) {
 }
 
 #[test]
-fn release_cdylib_matches_foundation_symbol_manifest() {
+fn release_cdylib_matches_through_symmetric_symbol_manifest() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let lib_path = manifest_dir.join("target/release/libsodium.so");
-    let expected_manifest = manifest_dir.join("cabi/expected/foundation.symbols");
+    let expected_manifest = manifest_dir.join("cabi/expected/through_symmetric.symbols");
     let kinds_manifest = manifest_dir.join("cabi/expected/upstream-kinds.tsv");
 
     let mut cargo = Command::new("cargo");
