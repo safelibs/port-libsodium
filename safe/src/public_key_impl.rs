@@ -155,6 +155,13 @@ fn reduce_scalar64(bytes: &[u8; 64]) -> [u8; 32] {
     Scalar::from_bytes_mod_order_wide(bytes).to_bytes()
 }
 
+fn sc25519_muladd(a: [u8; 32], b: [u8; 32], c: [u8; 32]) -> [u8; 32] {
+    let a = Scalar::from_bytes_mod_order(a);
+    let b = Scalar::from_bytes_mod_order(b);
+    let c = Scalar::from_bytes_mod_order(c);
+    (a * b + c).to_bytes()
+}
+
 fn sha512(bytes: &[u8]) -> [u8; 64] {
     let digest = Sha512::digest(bytes);
     let mut out = [0u8; 64];
@@ -264,25 +271,27 @@ fn ed25519_verify_detached(
 }
 
 fn legacy_edwards25519sha512batch_sign(msg: &[u8], sk: &[u8; SIGN_SECRETKEYBYTES]) -> Vec<u8> {
-    let a = scalar_from_clamped_bytes(sk[..32].try_into().unwrap());
+    let secret_scalar_bytes: [u8; 32] = sk[..32].try_into().unwrap();
 
     let mut nonce_hasher = Sha512::new();
     nonce_hasher.update(&sk[32..]);
     nonce_hasher.update(msg);
     let nonce = nonce_hasher.finalize();
-    let mut nonce_bytes = [0u8; 64];
-    nonce_bytes.copy_from_slice(&nonce);
-    let r = Scalar::from_bytes_mod_order_wide(&nonce_bytes);
-    let r_bytes = EdwardsPoint::mul_base(&r).compress().to_bytes();
+    let mut nonce_wide = [0u8; 64];
+    nonce_wide.copy_from_slice(&nonce);
+    let nonce_scalar_bytes = reduce_scalar64(&nonce_wide);
+    let nonce_scalar = Scalar::from_bytes_mod_order(nonce_scalar_bytes);
+    let r_bytes = EdwardsPoint::mul_base(&nonce_scalar).compress().to_bytes();
 
-    let mut h_hasher = Sha512::new();
-    h_hasher.update(r_bytes);
-    h_hasher.update(msg);
-    let h = h_hasher.finalize();
-    let mut h_bytes = [0u8; 64];
-    h_bytes.copy_from_slice(&h);
-    let k = Scalar::from_bytes_mod_order_wide(&h_bytes);
-    let s = (k * r + a).to_bytes();
+    let mut hram_hasher = Sha512::new();
+    hram_hasher.update(r_bytes);
+    hram_hasher.update(msg);
+    let hram = hram_hasher.finalize();
+    let mut hram_wide = [0u8; 64];
+    hram_wide.copy_from_slice(&hram);
+    let hram_scalar_bytes = reduce_scalar64(&hram_wide);
+    // obsolete.c uses sc25519_muladd(sig + 32, hram, nonce, sk)
+    let s = sc25519_muladd(hram_scalar_bytes, nonce_scalar_bytes, secret_scalar_bytes);
 
     let mut out = vec![0u8; SIGN_BYTES + msg.len()];
     out[..32].copy_from_slice(&r_bytes);

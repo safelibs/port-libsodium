@@ -1,3 +1,6 @@
+use curve25519_dalek::edwards::EdwardsPoint;
+use curve25519_dalek::scalar::Scalar;
+use sha2::{Digest, Sha512};
 use sodium::box_api;
 use sodium::box_api::curve25519xchacha20poly1305 as box_xchacha;
 use sodium::core::ed25519 as core_ed25519;
@@ -76,6 +79,13 @@ fn scalar_bytes(descending_from: u8) -> [u8; 32] {
         *byte = descending_from.wrapping_sub(i as u8);
     }
     out
+}
+
+fn clamp_ed25519_scalar(mut bytes: [u8; 32]) -> [u8; 32] {
+    bytes[0] &= 248;
+    bytes[31] &= 127;
+    bytes[31] |= 64;
+    bytes
 }
 
 #[test]
@@ -519,6 +529,55 @@ fn ristretto_and_signature_vectors_match_upstream() {
     );
     assert_eq!(legacy_opened_len, legacy_message.len() as u64);
     assert_eq!(&legacy_opened, legacy_message);
+}
+
+#[test]
+fn legacy_edwards25519sha512batch_matches_upstream_vector() {
+    init();
+
+    let seed: [u8; 32] = core::array::from_fn(|i| i as u8);
+    let digest = Sha512::digest(seed);
+    let mut legacy_sk = [0u8; 64];
+    legacy_sk.copy_from_slice(&digest);
+    let clamped = clamp_ed25519_scalar(legacy_sk[..32].try_into().unwrap());
+    legacy_sk[..32].copy_from_slice(&clamped);
+    let legacy_pk = EdwardsPoint::mul_base(&Scalar::from_bytes_mod_order(clamped))
+        .compress()
+        .to_bytes();
+    let message = b"legacy api vector";
+    let expected_signed = hex_decode(
+        "2b4f6e212406080097793e1ba62d2c59107267f0760c83883dcc4ce651473fbe6c65676163792061706920766563746f72c178aea69b7cf4e6dd65d79a57def07c02097f2375e600499d29fff8aa268b0e",
+    );
+
+    let mut signed = vec![0u8; expected_signed.len()];
+    let mut signed_len = 0u64;
+    assert_eq!(
+        legacy_sign::crypto_sign_edwards25519sha512batch(
+            signed.as_mut_ptr(),
+            &mut signed_len,
+            message.as_ptr(),
+            message.len() as u64,
+            legacy_sk.as_ptr(),
+        ),
+        0
+    );
+    assert_eq!(signed_len, expected_signed.len() as u64);
+    assert_eq!(signed, expected_signed);
+
+    let mut opened = vec![0u8; message.len()];
+    let mut opened_len = 0u64;
+    assert_eq!(
+        legacy_sign::crypto_sign_edwards25519sha512batch_open(
+            opened.as_mut_ptr(),
+            &mut opened_len,
+            signed.as_ptr(),
+            signed_len,
+            legacy_pk.as_ptr(),
+        ),
+        0
+    );
+    assert_eq!(opened_len, message.len() as u64);
+    assert_eq!(&opened, message);
 }
 
 #[test]
