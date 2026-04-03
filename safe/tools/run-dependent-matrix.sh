@@ -81,7 +81,6 @@ case "$mode" in
 esac
 
 report_dir="$(resolve_report_dir "$report_dir")"
-rm -rf "$report_dir"
 mkdir -p "$report_dir"
 
 args=(

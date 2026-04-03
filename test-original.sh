@@ -131,8 +131,12 @@ if [[ -n "$FROM_LIST" ]]; then
 fi
 
 if [[ -n "$REPORT_DIR" ]]; then
+  report_owner_uid="$(id -u)"
+  report_owner_gid="$(id -g)"
   docker_args+=(
     -e "LIBSODIUM_TEST_REPORT_DIR=/reports"
+    -e "LIBSODIUM_TEST_REPORT_OWNER_UID=$report_owner_uid"
+    -e "LIBSODIUM_TEST_REPORT_OWNER_GID=$report_owner_gid"
     -v "$REPORT_DIR":/reports
   )
 fi
@@ -150,6 +154,8 @@ ONLY_FILTER="${LIBSODIUM_TEST_ONLY:-}"
 FROM_LIST_PATH="${LIBSODIUM_TEST_FROM_LIST:-}"
 MODE="${LIBSODIUM_TEST_MODE:-safe}"
 REPORT_DIR="${LIBSODIUM_TEST_REPORT_DIR:-}"
+REPORT_OWNER_UID="${LIBSODIUM_TEST_REPORT_OWNER_UID:-}"
+REPORT_OWNER_GID="${LIBSODIUM_TEST_REPORT_OWNER_GID:-}"
 STRICT="${LIBSODIUM_TEST_STRICT:-0}"
 MULTIARCH="$(gcc -print-multiarch)"
 EXPECTED_LIBSODIUM_PATH=""
@@ -174,6 +180,20 @@ die() {
   exit 1
 }
 
+restore_report_ownership() {
+  if [[ -z "$REPORT_DIR" || ! -d "$REPORT_DIR" ]]; then
+    return 0
+  fi
+
+  chown -R "$REPORT_OWNER_UID:$REPORT_OWNER_GID" "$REPORT_DIR"
+}
+
+reset_report_dir() {
+  [[ -n "$REPORT_DIR" ]] || return 0
+  mkdir -p "$REPORT_DIR"
+  find "$REPORT_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+}
+
 case "$MODE" in
   safe|original)
     ;;
@@ -189,6 +209,13 @@ case "$STRICT" in
     die "unsupported strict flag: $STRICT"
     ;;
 esac
+
+if [[ -n "$REPORT_DIR" ]]; then
+  [[ "$REPORT_OWNER_UID" =~ ^[0-9]+$ ]] || die "missing or invalid report owner uid"
+  [[ "$REPORT_OWNER_GID" =~ ^[0-9]+$ ]] || die "missing or invalid report owner gid"
+  trap restore_report_ownership EXIT
+  reset_report_dir
+fi
 
 if [[ "$MODE" == "original" ]]; then
   export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib/$MULTIARCH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -329,8 +356,6 @@ setup_report_dir() {
   FAILURES_FILE="$REPORT_DIR/failures.list"
   LOG_DIR="$REPORT_DIR/logs"
 
-  mkdir -p "$REPORT_DIR"
-  rm -rf "$LOG_DIR"
   mkdir -p "$LOG_DIR"
   printf 'package\tmode\tstatus\tlog_path\n' > "$RESULTS_FILE"
   : > "$FAILURES_FILE"
