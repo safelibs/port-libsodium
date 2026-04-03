@@ -5,6 +5,7 @@ use std::panic::catch_unwind;
 use std::process;
 use std::slice;
 
+/// Ensures Rust panics abort rather than unwind across the C ABI boundary.
 pub fn abort_on_panic<T>(f: impl FnOnce() -> T) -> T {
     match catch_unwind(AssertUnwindSafe(f)) {
         Ok(value) => value,
@@ -12,6 +13,8 @@ pub fn abort_on_panic<T>(f: impl FnOnce() -> T) -> T {
     }
 }
 
+/// SAFETY: the caller must be running on a supported libc platform and may only
+/// touch the current thread's errno slot.
 pub unsafe fn set_errno(value: c_int) {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {
@@ -24,6 +27,8 @@ pub unsafe fn set_errno(value: c_int) {
     }
 }
 
+/// SAFETY: `ptr` must be null or valid for `len` elements for the lifetime of
+/// the returned slice.
 pub unsafe fn opt_slice<'a, T>(ptr: *const T, len: usize) -> &'a [T] {
     if len == 0 {
         &[]
@@ -32,6 +37,8 @@ pub unsafe fn opt_slice<'a, T>(ptr: *const T, len: usize) -> &'a [T] {
     }
 }
 
+/// SAFETY: `ptr` must be null or valid for `len` elements and uniquely borrowed
+/// for the lifetime of the returned slice.
 pub unsafe fn opt_slice_mut<'a, T>(ptr: *mut T, len: usize) -> &'a mut [T] {
     if len == 0 {
         &mut []
@@ -40,12 +47,14 @@ pub unsafe fn opt_slice_mut<'a, T>(ptr: *mut T, len: usize) -> &'a mut [T] {
     }
 }
 
+/// SAFETY: `src` and `dst` must be valid for `len` bytes. Overlap is allowed.
 pub unsafe fn copy_allow_overlap(dst: *mut u8, src: *const u8, len: usize) {
     if len != 0 {
         ptr::copy(src, dst, len);
     }
 }
 
+/// SAFETY: `ptr` must be null or valid to receive a single initialized `T`.
 pub unsafe fn write_opt<T>(ptr: *mut T, value: T) {
     if !ptr.is_null() {
         ptr.write(value);
@@ -60,6 +69,7 @@ pub fn static_cstr(bytes: &'static [u8]) -> *const c_char {
     bytes.as_ptr().cast()
 }
 
+/// SAFETY: `ptr` must be null or originate from `sodium_set_misuse_handler`.
 pub unsafe fn cast_handler(ptr: *mut c_void) -> Option<unsafe extern "C" fn()> {
     if ptr.is_null() {
         None

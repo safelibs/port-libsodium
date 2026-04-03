@@ -133,6 +133,8 @@ MODE="${LIBSODIUM_TEST_MODE:-safe}"
 MULTIARCH="$(gcc -print-multiarch)"
 EXPECTED_LIBSODIUM_PATH=""
 EXPECTED_LIBSODIUM_LIBDIR=""
+DEPENDENTS_EXPECTED=16
+DEPENDENTS_RUN=0
 
 log_step() {
   printf '\n==> %s\n' "$1"
@@ -232,9 +234,13 @@ assert_uses_selected_libsodium() {
 }
 
 assert_dependents_inventory() {
-  local expected actual
+  local expected actual actual_count
   expected=$'minisign\nshadowsocks-libev\nlibtoxcore2\nqtox\nfastd\ncurvedns\nnix-bin\nlibzmq5\nvim\nphp8.3-cli\npython3-nacl\nruby-rbnacl\nr-cran-sodium\nlibrust-libsodium-sys-dev\nlibtoxcore-dev\nlibzmq3-dev'
   actual="$(jq -r '.dependents[].package' "$ROOT/dependents.json")"
+  actual_count="$(jq '.dependents | length' "$ROOT/dependents.json")"
+
+  [[ "$actual_count" == "$DEPENDENTS_EXPECTED" ]] \
+    || die "dependents.json contains $actual_count entries, expected $DEPENDENTS_EXPECTED"
 
   if [[ "$actual" != "$expected" ]]; then
     echo "dependents.json does not match the expected dependent matrix" >&2
@@ -257,6 +263,7 @@ run_selected() {
   fi
 
   "$fn"
+  DEPENDENTS_RUN=$((DEPENDENTS_RUN + 1))
 }
 
 build_original_libsodium() {
@@ -848,4 +855,13 @@ run_selected r-cran-sodium test_r_cran_sodium
 run_selected librust-libsodium-sys-dev test_librust_libsodium_sys_dev
 run_selected libtoxcore-dev test_libtoxcore_dev
 run_selected libzmq3-dev test_libzmq3_dev
+
+if [[ -n "$ONLY_FILTER" ]]; then
+  [[ "$DEPENDENTS_RUN" -eq 1 ]] || die "expected exactly one dependent to run for --only, got $DEPENDENTS_RUN"
+  printf '\nConfirmed selected dependent entry %s passed through the modified Docker harness.\n' "$ONLY_FILTER"
+else
+  [[ "$DEPENDENTS_RUN" -eq "$DEPENDENTS_EXPECTED" ]] \
+    || die "expected $DEPENDENTS_EXPECTED dependent checks to pass, got $DEPENDENTS_RUN"
+  printf '\nConfirmed all 16 dependent entries in dependents.json passed through the modified Docker harness.\n'
+fi
 CONTAINER_SCRIPT

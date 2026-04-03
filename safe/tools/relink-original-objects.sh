@@ -7,6 +7,11 @@ repo_dir=$(cd -- "$safe_dir/.." && pwd)
 orig_test_dir="$repo_dir/original/test/default"
 target_dir="$safe_dir/target/release"
 
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
 phase4_subset=(
   codecs
   randombytes
@@ -154,6 +159,14 @@ select_tests() {
   exit 1
 }
 
+all_mode=false
+if [[ ${1:-} == "--all" ]]; then
+  all_mode=true
+  mapfile -t active_inventory < <(active_test_inventory | sort -u)
+  [[ ${#active_inventory[@]} -eq 77 ]] \
+    || die "expected 77 runnable upstream tests for object relinking, found ${#active_inventory[@]}"
+fi
+
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 runtime_libdir="$tmpdir/lib"
@@ -170,6 +183,14 @@ mapfile -t selected < <(
       done
 )
 
+[[ ${#selected[@]} -gt 0 ]] || die "no relinkable upstream object tests matched the selection"
+
+if $all_mode; then
+  [[ ${#selected[@]} -eq ${#active_inventory[@]} ]] \
+    || die "--all resolved ${#selected[@]} relinkable object tests, expected ${#active_inventory[@]}"
+fi
+
+ran=0
 for name in "${selected[@]}"; do
   cc \
     "$orig_test_dir/$name.o" \
@@ -182,4 +203,12 @@ for name in "${selected[@]}"; do
     cd "$orig_test_dir"
     LD_LIBRARY_PATH="$runtime_libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$tmpdir/$name"
   )
+  ran=$((ran + 1))
 done
+
+if $all_mode; then
+  [[ "$ran" -eq 77 ]] || die "expected 77 relinked object tests to pass, got $ran"
+  echo "Confirmed all 77 upstream prebuilt object files relink and run successfully."
+else
+  printf 'Relinked and ran %d upstream object test(s).\n' "$ran"
+fi

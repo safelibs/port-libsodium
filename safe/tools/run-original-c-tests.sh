@@ -8,6 +8,11 @@ orig_test_dir="$repo_dir/original/test/default"
 quirks_dir="$repo_dir/original/test/quirks"
 target_dir="$safe_dir/target/release"
 
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
 phase4_subset=(
   codecs
   randombytes
@@ -135,6 +140,13 @@ active_test_inventory() {
   ' "$repo_dir/original/test/default/Makefile.am"
 }
 
+all_exp_inventory() {
+  (
+    cd "$orig_test_dir"
+    printf '%s\n' *.exp
+  ) | sed 's/\.exp$//' | sort -u
+}
+
 select_tests() {
   if [[ ${1:-} == "--all" ]]; then
     shift
@@ -155,6 +167,21 @@ select_tests() {
   exit 1
 }
 
+all_mode=false
+if [[ ${1:-} == "--all" ]]; then
+  all_mode=true
+  mapfile -t active_inventory < <(active_test_inventory | sort -u)
+  mapfile -t orphan_exp < <(
+    comm -13 \
+      <(printf '%s\n' "${active_inventory[@]}") \
+      <(all_exp_inventory)
+  )
+  [[ ${#active_inventory[@]} -eq 77 ]] \
+    || die "expected 77 runnable upstream C tests, found ${#active_inventory[@]}"
+  [[ ${#orphan_exp[@]} -eq 1 && ${orphan_exp[0]} == "hash2" ]] \
+    || die "expected hash2.exp to be the only orphan .exp fixture, found: ${orphan_exp[*]:-<none>}"
+fi
+
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 runtime_libdir="$tmpdir/lib"
@@ -171,6 +198,15 @@ mapfile -t selected < <(
       done
 )
 
+[[ ${#selected[@]} -gt 0 ]] || die "no runnable upstream C tests matched the selection"
+
+if $all_mode; then
+  [[ ${#selected[@]} -eq ${#active_inventory[@]} ]] \
+    || die "--all resolved ${#selected[@]} runnable C tests, expected ${#active_inventory[@]}"
+  echo "Confirmed run-original-c-tests.sh --all covers exactly 77 runnable upstream C tests and excludes orphan hash2.exp."
+fi
+
+ran=0
 for name in "${selected[@]}"; do
   cc \
     -std=c11 \
@@ -190,4 +226,12 @@ for name in "${selected[@]}"; do
     cd "$orig_test_dir"
     LD_LIBRARY_PATH="$runtime_libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$tmpdir/$name"
   )
+  ran=$((ran + 1))
 done
+
+if $all_mode; then
+  [[ "$ran" -eq 77 ]] || die "expected 77 upstream source tests to pass, got $ran"
+  echo "Confirmed all 77 upstream C tests pass from source."
+else
+  printf 'Passed %d upstream C source test(s).\n' "$ran"
+fi

@@ -133,3 +133,13 @@ if [[ $(wc -l < "$tmpdir/expected.kinds") -ne $(wc -l < "$tmpdir/expected.names"
 fi
 
 diff -u "$tmpdir/expected.kinds" "$tmpdir/actual.kinds"
+
+symbol_count=$(wc -l < "$tmpdir/actual.names")
+
+if [[ $(basename "$manifest") == "full.symbols" ]]; then
+  [[ "$symbol_count" -eq 609 ]] \
+    || die "expected 609 exported symbols in the full ABI contract, found $symbol_count"
+  echo "Confirmed 609 exported symbols exactly match the upstream ABI contract."
+else
+  echo "Confirmed $symbol_count exported symbols match $(basename "$manifest")."
+fi

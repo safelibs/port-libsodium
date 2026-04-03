@@ -729,9 +729,7 @@ fn poly1305_finalize_repr(state: &mut Poly1305StateRepr) -> [u8; POLY1305_BYTES]
 
 fn random_keygen(k: *mut u8, len: usize) {
     if len != 0 {
-        unsafe {
-            fill_random_bytes(k, len);
-        }
+        fill_random_bytes(k, len);
     }
 }
 
@@ -2873,7 +2871,7 @@ pub unsafe fn crypto_secretstream_xchacha20poly1305_pull(
     let mut cipher = ChaCha20::new_from_slices(&st.k, &st.nonce).unwrap();
     cipher.seek(64u32);
     cipher.apply_keystream(&mut block);
-    let mut tag = block[0];
+    let tag = block[0];
     block[0] = ct[0];
     poly1305_update_repr(&mut poly, &block);
     poly1305_update_repr(&mut poly, &ct[1..1 + mlen]);

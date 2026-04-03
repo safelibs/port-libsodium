@@ -113,6 +113,8 @@ unsafe fn sodium_sub_inner(a: *mut u8, b: *const u8, len: usize) {
     }
 }
 
+// Raw OS page-protection boundary. Callers provide page-aligned spans created by
+// `sodium_malloc_inner`.
 unsafe fn mprotect_noaccess(ptr: *mut c_void, size: usize) -> c_int {
     libc::mprotect(ptr, size, libc::PROT_NONE)
 }
@@ -126,11 +128,13 @@ unsafe fn mprotect_readwrite(ptr: *mut c_void, size: usize) -> c_int {
 }
 
 #[inline]
+// Deliberately faults like upstream when the guarded allocation canary is broken.
 unsafe fn out_of_bounds() -> ! {
     libc::raise(libc::SIGSEGV);
     libc::abort();
 }
 
+// Raw mmap/munmap boundary. The caller owns the full mapping size.
 unsafe fn alloc_aligned(size: usize) -> *mut u8 {
     let ptr = libc::mmap(
         ptr::null_mut(),
@@ -151,6 +155,8 @@ unsafe fn free_aligned(ptr: *mut u8, size: usize) {
     libc::munmap(ptr.cast(), size);
 }
 
+// Translates the public pointer returned by sodium_malloc back to its guarded
+// allocation header.
 unsafe fn unprotected_ptr_from_user_ptr(ptr: *mut c_void) -> *mut u8 {
     let config = alloc_config();
     let canary_ptr = (ptr as *mut u8).sub(CANARY_SIZE);
@@ -162,6 +168,8 @@ unsafe fn unprotected_ptr_from_user_ptr(ptr: *mut c_void) -> *mut u8 {
     unprotected
 }
 
+// Keeps the mmap/mlock/mprotect sequence inside a single unsafe boundary so the
+// exported allocation wrappers stay thin and panic-aborting.
 unsafe fn sodium_malloc_inner(size: usize) -> *mut c_void {
     let config = alloc_config();
 
@@ -201,6 +209,8 @@ unsafe fn sodium_malloc_inner(size: usize) -> *mut c_void {
     user_ptr.cast()
 }
 
+// Applies mprotect transitions only to allocations previously returned by
+// sodium_malloc.
 unsafe fn sodium_mprotect_inner(
     ptr: *mut c_void,
     callback: unsafe fn(*mut c_void, usize) -> c_int,
