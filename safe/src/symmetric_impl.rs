@@ -7,7 +7,8 @@ use argon2::{
     },
     Algorithm as Argon2Algorithm, Argon2, Params as Argon2Params, Version as Argon2Version,
 };
-use blake2b_simd::{Hash as Blake2bHash, Params as Blake2bParams, State as Blake2bState};
+use blake2::Blake2bVarCore;
+use blake2b_simd::Params as Blake2bParams;
 use chacha20::cipher::{KeyIvInit as _, StreamCipher as _, StreamCipherSeek as _};
 use chacha20::{ChaCha20, ChaCha20Legacy};
 use core::cmp;
@@ -40,11 +41,6 @@ const BLAKE2B_KEYBYTES: usize = 32;
 const BLAKE2B_SALTBYTES: usize = 16;
 const BLAKE2B_PERSONALBYTES: usize = 16;
 
-#[repr(C)]
-struct Blake2bHashRepr {
-    bytes: [u8; BLAKE2B_BYTES_MAX],
-    len: u8,
-}
 const SALSA_SIGMA: [u8; 16] = *b"expand 32-byte k";
 const CHACHA_SIGMA: [u8; 16] = *b"expand 32-byte k";
 const STREAM_KEYBYTES: usize = 32;
@@ -193,10 +189,22 @@ struct SecretstreamStateRepr {
     pad: [u8; 8],
 }
 
-const _: () = assert!(size_of::<Blake2bState>() < size_of::<crypto_generichash_blake2b_state>());
+type Blake2bCoreBuffer = blake2::digest::block_api::Buffer<Blake2bVarCore>;
+
+#[repr(C)]
+// Use the public variable-output core so finalization can safely materialize
+// the full 64-byte BLAKE2b block even when the incremental state was initialized
+// for a shorter default digest, matching libsodium's ABI contract.
+struct Blake2bStateRepr {
+    core: Blake2bVarCore,
+    buffer: Blake2bCoreBuffer,
+    finalized: u8,
+}
+
+const _: () =
+    assert!(size_of::<Blake2bStateRepr>() < size_of::<crypto_generichash_blake2b_state>());
 const _: () =
     assert!(size_of::<Poly1305StateRepr>() <= size_of::<crypto_onetimeauth_poly1305_state>());
-const BLAKE2B_STATE_FINALIZED_OFFSET: usize = size_of::<Blake2bState>();
 
 fn len_to_usize(len: u64) -> usize {
     usize::try_from(len).unwrap_or_else(|_| crate::foundation::core::sodium_misuse())
@@ -300,23 +308,14 @@ unsafe fn hmac_sha512_state(
     &mut *(state.cast::<HmacSha512StateRepr>())
 }
 
-unsafe fn blake2b_state(state: *mut crypto_generichash_blake2b_state) -> &'static mut Blake2bState {
-    &mut *(state.cast::<Blake2bState>())
-}
-
-unsafe fn blake2b_hash_bytes(hash: &Blake2bHash) -> [u8; BLAKE2B_BYTES_MAX] {
-    (*(hash as *const Blake2bHash).cast::<Blake2bHashRepr>()).bytes
+unsafe fn blake2b_state(
+    state: *mut crypto_generichash_blake2b_state,
+) -> &'static mut Blake2bStateRepr {
+    &mut *(state.cast::<Blake2bStateRepr>())
 }
 
 unsafe fn blake2b_state_finalized(state: *mut crypto_generichash_blake2b_state) -> bool {
-    *state.cast::<u8>().add(BLAKE2B_STATE_FINALIZED_OFFSET) != 0
-}
-
-unsafe fn set_blake2b_state_finalized(
-    state: *mut crypto_generichash_blake2b_state,
-    finalized: bool,
-) {
-    *state.cast::<u8>().add(BLAKE2B_STATE_FINALIZED_OFFSET) = u8::from(finalized);
+    blake2b_state(state).finalized != 0
 }
 
 unsafe fn poly1305_state(
@@ -1228,6 +1227,53 @@ fn blake2b_params(
     Some(params)
 }
 
+fn blake2b_state_repr(
+    outlen: usize,
+    key: Option<&[u8]>,
+    salt: Option<&[u8]>,
+    personal: Option<&[u8]>,
+) -> Option<Blake2bStateRepr> {
+    if outlen == 0 || outlen > BLAKE2B_BYTES_MAX {
+        return None;
+    }
+    if let Some(key) = key {
+        if key.len() > BLAKE2B_KEYBYTES_MAX {
+            return None;
+        }
+    }
+    if let Some(salt) = salt {
+        if salt.len() != BLAKE2B_SALTBYTES {
+            return None;
+        }
+    }
+    if let Some(personal) = personal {
+        if personal.len() != BLAKE2B_PERSONALBYTES {
+            return None;
+        }
+    }
+
+    let key_len = key.map_or(0, <[u8]>::len);
+    let core = Blake2bVarCore::new_with_params(
+        salt.unwrap_or(&[]),
+        personal.unwrap_or(&[]),
+        key_len,
+        outlen,
+    );
+    let buffer = if let Some(key) = key {
+        let mut padded_key = blake2::digest::block_api::Block::<Blake2bVarCore>::default();
+        padded_key[..key.len()].copy_from_slice(key);
+        Blake2bCoreBuffer::new(&padded_key)
+    } else {
+        Blake2bCoreBuffer::default()
+    };
+
+    Some(Blake2bStateRepr {
+        core,
+        buffer,
+        finalized: 0,
+    })
+}
+
 pub unsafe fn crypto_generichash(
     out: *mut u8,
     outlen: usize,
@@ -1263,8 +1309,7 @@ pub unsafe fn crypto_generichash_blake2b(
     let mut state = params.to_state();
     state.update(opt_slice(in_, len_to_usize(inlen)));
     let hash = state.finalize();
-    let bytes = blake2b_hash_bytes(&hash);
-    opt_slice_mut(out, outlen).copy_from_slice(&bytes[..outlen]);
+    opt_slice_mut(out, outlen).copy_from_slice(hash.as_bytes());
     0
 }
 
@@ -1291,10 +1336,15 @@ pub unsafe fn crypto_generichash_blake2b_final(
     if blake2b_state_finalized(state) {
         return -1;
     }
-    let hash = blake2b_state(state).finalize();
-    let bytes = blake2b_hash_bytes(&hash);
-    opt_slice_mut(out, outlen).copy_from_slice(&bytes[..outlen]);
-    set_blake2b_state_finalized(state, true);
+    let state = blake2b_state(state);
+    let core = &mut state.core;
+    let buffer = &mut state.buffer;
+    let mut full = blake2::digest::Output::<Blake2bVarCore>::default();
+    blake2::digest::block_api::VariableOutputCore::finalize_variable_core(
+        core, buffer, &mut full,
+    );
+    opt_slice_mut(out, outlen).copy_from_slice(&full[..outlen]);
+    state.finalized = 1;
     0
 }
 
@@ -1322,7 +1372,7 @@ pub unsafe fn crypto_generichash_blake2b_init_salt_personal(
     salt: *const u8,
     personal: *const u8,
 ) -> c_int {
-    let params = match blake2b_params(
+    let state_repr = match blake2b_state_repr(
         outlen,
         if key.is_null() || keylen == 0 {
             None
@@ -1340,7 +1390,7 @@ pub unsafe fn crypto_generichash_blake2b_init_salt_personal(
             Some(opt_slice(personal, BLAKE2B_PERSONALBYTES))
         },
     ) {
-        Some(params) => params,
+        Some(state_repr) => state_repr,
         None => return -1,
     };
     ptr::write_bytes(
@@ -1348,8 +1398,7 @@ pub unsafe fn crypto_generichash_blake2b_init_salt_personal(
         0,
         size_of::<crypto_generichash_blake2b_state>(),
     );
-    ptr::write(state.cast::<Blake2bState>(), params.to_state());
-    set_blake2b_state_finalized(state, false);
+    ptr::write(state.cast::<Blake2bStateRepr>(), state_repr);
     0
 }
 
@@ -1407,8 +1456,7 @@ pub unsafe fn crypto_generichash_blake2b_salt_personal(
     let mut state = params.to_state();
     state.update(opt_slice(in_, len_to_usize(inlen)));
     let hash = state.finalize();
-    let bytes = blake2b_hash_bytes(&hash);
-    opt_slice_mut(out, outlen).copy_from_slice(&bytes[..outlen]);
+    opt_slice_mut(out, outlen).copy_from_slice(hash.as_bytes());
     0
 }
 
@@ -1425,7 +1473,12 @@ pub unsafe fn crypto_generichash_blake2b_update(
     in_: *const u8,
     inlen: u64,
 ) -> c_int {
-    blake2b_state(state).update(opt_slice(in_, len_to_usize(inlen)));
+    let state = blake2b_state(state);
+    let core = &mut state.core;
+    let buffer = &mut state.buffer;
+    buffer.digest_blocks(opt_slice(in_, len_to_usize(inlen)), |blocks| {
+        blake2::digest::block_api::UpdateCore::update_blocks(core, blocks);
+    });
     0
 }
 

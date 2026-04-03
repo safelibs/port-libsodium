@@ -534,6 +534,7 @@ dependencies = [
  "aes-gcm",
  "argon2",
  "base64",
+ "blake2",
  "blake2b_simd",
  "cc",
  "chacha20",
