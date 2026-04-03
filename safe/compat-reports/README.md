@@ -48,3 +48,23 @@ Tracked files in this tree are limited to:
 Everything else under `safe/compat-reports/` is generated workspace state and stays ignored, including baseline report directories, per-package `logs/`, archived artifacts, and the entire `safe/compat-reports/final/` tree.
 
 Later phases must consume the committed `dependents/` and `dependents-rerun/` ledgers in place instead of inventing replacement ledgers elsewhere.
+
+The final release-closure workflow writes a generated review bundle under
+`safe/compat-reports/final/` by default. That bundle is workspace evidence, not
+committed history, and it must include at least:
+
+- `summary.md`
+- `cargo.log`
+- `symbols.log`
+- `source-tests.log`
+- `relink.log`
+- `packages.log`
+- `dependents/results.tsv`
+- `dependents/failures.list`
+- `dependents/logs/<package>.log`
+- `unsafe-audit.txt`
+
+`safe/tools/run-full-compat.sh --report-dir <dir>` is responsible for creating
+that final bundle, rebuilding the release cdylib before ABI/source/relink
+checks consume `safe/target/release/libsodium.so`, and failing the run when any
+final dependent row is not `PASS`.
