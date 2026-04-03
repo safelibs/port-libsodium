@@ -1,3 +1,12 @@
+#include <stddef.h>
+
+#if defined(__clang__) || defined(__GNUC__)
+# define SODIUM_STACK_ALLOCA __builtin_alloca
+#else
+# include <alloca.h>
+# define SODIUM_STACK_ALLOCA alloca
+#endif
+
 typedef struct CPUFeatures_ {
     int initialized;
     int has_neon;
@@ -16,7 +25,10 @@ typedef struct CPUFeatures_ {
 static CPUFeatures cpu_features;
 
 #define SODIUM_WEAK_EXPORT __attribute__((weak, visibility("default")))
+#define SODIUM_EXPORT __attribute__((visibility("default")))
 #define SODIUM_HIDDEN __attribute__((visibility("hidden")))
+
+void sodium_memzero(void * const pnt, const size_t len);
 
 SODIUM_HIDDEN int
 _sodium_runtime_get_cpu_features(void)
@@ -119,4 +131,12 @@ SODIUM_WEAK_EXPORT int
 sodium_runtime_has_rdrand(void)
 {
     return cpu_features.has_rdrand;
+}
+
+SODIUM_EXPORT void
+sodium_stackzero(const size_t len)
+{
+    if (len > 0U) {
+        sodium_memzero(SODIUM_STACK_ALLOCA(len), len);
+    }
 }

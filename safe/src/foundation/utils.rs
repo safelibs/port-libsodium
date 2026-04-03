@@ -228,16 +228,6 @@ pub extern "C" fn sodium_memzero(pnt: *mut c_void, len: usize) {
 }
 
 #[no_mangle]
-pub extern "C" fn sodium_stackzero(len: usize) {
-    abort_on_panic(|| {
-        let mut scratch = vec![0u8; len];
-        unsafe {
-            sodium_memzero_inner(scratch.as_mut_ptr(), scratch.len());
-        }
-    })
-}
-
-#[no_mangle]
 pub extern "C" fn sodium_memcmp(b1: *const c_void, b2: *const c_void, len: usize) -> c_int {
     abort_on_panic(|| sodium_memcmp_inner(b1.cast(), b2.cast(), len))
 }
