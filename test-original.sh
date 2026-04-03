@@ -1024,7 +1024,7 @@ run_package() {
     log_path="$REPORT_DIR/$log_rel"
 
     set +e
-    (dispatch_package "$package") >"$log_path" 2>&1
+    (set -euo pipefail; dispatch_package "$package") >"$log_path" 2>&1
     rc=$?
     set -e
 
