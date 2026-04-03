@@ -1,4 +1,0 @@
-debian/tmp/usr/include
-debian/tmp/usr/lib/x86_64-linux-gnu/libsodium.so
-debian/tmp/usr/lib/x86_64-linux-gnu/libsodium.a
-debian/tmp/usr/lib/x86_64-linux-gnu/pkgconfig/libsodium.pc
