@@ -9,6 +9,7 @@ phases:
     required_preexisting_inputs:
       - original/configure.ac
       - original/src/libsodium/Makefile.am
+      - original/src/libsodium/include/
       - original/src/libsodium/include/Makefile.am
       - original/src/libsodium/include/sodium.h
       - original/src/libsodium/include/sodium/export.h
@@ -22,7 +23,6 @@ phases:
       - original/src/libsodium/include/sodium/crypto_verify_16.h
       - original/src/libsodium/include/sodium/crypto_verify_32.h
       - original/src/libsodium/include/sodium/crypto_verify_64.h
-      - "original/src/libsodium/include/sodium/*.h"
       - original/src/libsodium/sodium/core.c
       - original/src/libsodium/randombytes/randombytes.c
       - original/src/libsodium/randombytes/internal/randombytes_internal_random.c
@@ -35,10 +35,8 @@ phases:
       - original/libsodium.pc.in
       - original/src/libsodium/.libs/libsodium.so
       - original/test/default/Makefile.am
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
-      - original/test/default/test-suite.log
+      - original/test/default/
+      - original/test/default/hash2.exp
   - order: 2
     id: check_safe_foundation
     type: check
@@ -46,44 +44,7 @@ phases:
     required_preexisting_inputs:
       - safe/Cargo.toml
       - safe/build.rs
-      - safe/src/lib.rs
-      - safe/src/abi/mod.rs
-      - safe/src/abi/types.rs
-      - safe/src/ffi/mod.rs
-      - safe/src/ffi/helpers.rs
-      - "safe/src/foundation/*.rs"
-      - safe/cabi/weak_runtime.c
-      - safe/cabi/libsodium.map
-      - safe/cabi/expected/foundation.symbols
-      - safe/cabi/expected/through_symmetric.symbols
-      - safe/cabi/expected/through_public_key.symbols
-      - safe/cabi/expected/full.symbols
-      - safe/cabi/expected/upstream-kinds.tsv
-      - safe/tools/check-symbols.sh
-      - safe/tools/run-original-c-tests.sh
-      - safe/tools/relink-original-objects.sh
-      - safe/tests/abi_layout.rs
-      - safe/tests/abi_symbols.rs
-      - safe/tests/ported_foundation.rs
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
-      - original/test/default/Makefile.am
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
-  - order: 3
-    id: impl_safe_symmetric
-    type: implement
-    bounce_target: null
-    required_preexisting_inputs:
-      - safe/Cargo.toml
-      - safe/build.rs
-      - safe/src/lib.rs
-      - safe/src/abi/mod.rs
-      - safe/src/abi/types.rs
-      - safe/src/ffi/mod.rs
-      - safe/src/ffi/helpers.rs
-      - "safe/src/foundation/*.rs"
+      - safe/src/
       - safe/cabi/weak_runtime.c
       - safe/cabi/libsodium.map
       - safe/cabi/expected/foundation.symbols
@@ -98,10 +59,32 @@ phases:
       - safe/tests/abi_layout.rs
       - safe/tests/abi_symbols.rs
       - safe/tests/ported_foundation.rs
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
-      - original/src/libsodium/Makefile.am
-      - original/src/libsodium/include/Makefile.am
+      - safe/include/
+      - original/test/default/Makefile.am
+      - original/test/default/
+  - order: 3
+    id: impl_safe_symmetric
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/src/
+      - safe/cabi/weak_runtime.c
+      - safe/cabi/libsodium.map
+      - safe/cabi/expected/foundation.symbols
+      - safe/cabi/expected/through_symmetric.symbols
+      - safe/cabi/expected/through_public_key.symbols
+      - safe/cabi/expected/full.symbols
+      - safe/cabi/expected/upstream-kinds.tsv
+      - safe/tools/sync-upstream-interface.sh
+      - safe/tools/check-symbols.sh
+      - safe/tools/run-original-c-tests.sh
+      - safe/tools/relink-original-objects.sh
+      - safe/tests/abi_layout.rs
+      - safe/tests/abi_symbols.rs
+      - safe/tests/ported_foundation.rs
+      - safe/include/
       - original/src/libsodium/include/sodium/crypto_hash.h
       - original/src/libsodium/include/sodium/crypto_hash_sha256.h
       - original/src/libsodium/include/sodium/crypto_hash_sha512.h
@@ -133,44 +116,25 @@ phases:
       - original/src/libsodium/include/sodium/crypto_shorthash_siphash24.h
       - original/src/libsodium/include/sodium/crypto_aead_chacha20poly1305.h
       - original/src/libsodium/include/sodium/crypto_aead_xchacha20poly1305.h
-      - original/test/default/Makefile.am
+      - original/src/libsodium/
+      - original/test/default/
       - original/test/default/xchacha20.c
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
+      - original/test/default/metamorphic.c
   - order: 4
     id: check_safe_symmetric
     type: check
     bounce_target: impl_safe_symmetric
     required_preexisting_inputs:
       - safe/Cargo.toml
-      - safe/build.rs
-      - "safe/src/hash/*.rs"
-      - safe/src/generichash/mod.rs
-      - "safe/src/auth/*.rs"
-      - safe/src/onetimeauth/poly1305.rs
-      - "safe/src/stream/*.rs"
-      - safe/src/core/hsalsa20.rs
-      - safe/src/core/hchacha20.rs
-      - safe/src/core/salsa.rs
-      - safe/src/secretbox/mod.rs
-      - safe/src/secretstream.rs
-      - safe/src/shorthash.rs
-      - safe/src/aead/chacha20poly1305.rs
-      - safe/src/aead/xchacha20poly1305.rs
-      - safe/tests/ported_symmetric.rs
+      - safe/src/
+      - safe/cabi/expected/through_symmetric.symbols
+      - safe/cabi/expected/upstream-kinds.tsv
       - safe/tools/check-symbols.sh
       - safe/tools/run-original-c-tests.sh
       - safe/tools/relink-original-objects.sh
-      - safe/cabi/expected/through_symmetric.symbols
-      - safe/cabi/expected/upstream-kinds.tsv
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
-      - original/test/default/Makefile.am
-      - original/test/default/xchacha20.c
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
+      - safe/tests/ported_symmetric.rs
+      - safe/include/
+      - original/test/default/
   - order: 5
     id: impl_safe_public_key
     type: implement
@@ -178,34 +142,23 @@ phases:
     required_preexisting_inputs:
       - safe/Cargo.toml
       - safe/build.rs
-      - safe/src/lib.rs
-      - safe/src/abi/mod.rs
-      - safe/src/abi/types.rs
-      - safe/src/ffi/mod.rs
-      - safe/src/ffi/helpers.rs
-      - "safe/src/foundation/*.rs"
-      - "safe/src/hash/*.rs"
-      - safe/src/generichash/mod.rs
-      - "safe/src/auth/*.rs"
-      - safe/src/onetimeauth/poly1305.rs
-      - "safe/src/stream/*.rs"
-      - safe/src/core/hsalsa20.rs
-      - safe/src/core/hchacha20.rs
-      - safe/src/core/salsa.rs
-      - safe/src/secretbox/mod.rs
-      - safe/src/secretstream.rs
-      - safe/src/shorthash.rs
-      - safe/src/aead/chacha20poly1305.rs
-      - safe/src/aead/xchacha20poly1305.rs
+      - safe/src/
+      - safe/cabi/weak_runtime.c
       - safe/cabi/libsodium.map
+      - safe/cabi/expected/foundation.symbols
+      - safe/cabi/expected/through_symmetric.symbols
       - safe/cabi/expected/through_public_key.symbols
+      - safe/cabi/expected/full.symbols
       - safe/cabi/expected/upstream-kinds.tsv
+      - safe/tools/sync-upstream-interface.sh
       - safe/tools/check-symbols.sh
       - safe/tools/run-original-c-tests.sh
       - safe/tools/relink-original-objects.sh
+      - safe/tests/abi_layout.rs
+      - safe/tests/abi_symbols.rs
+      - safe/tests/ported_foundation.rs
       - safe/tests/ported_symmetric.rs
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
+      - safe/include/
       - original/src/libsodium/include/sodium/crypto_scalarmult.h
       - original/src/libsodium/include/sodium/crypto_scalarmult_curve25519.h
       - original/src/libsodium/include/sodium/crypto_scalarmult_ed25519.h
@@ -219,45 +172,33 @@ phases:
       - original/src/libsodium/include/sodium/crypto_box_curve25519xsalsa20poly1305.h
       - original/src/libsodium/include/sodium/crypto_box_curve25519xchacha20poly1305.h
       - original/src/libsodium/include/sodium/crypto_kx.h
-      - "original/src/libsodium/crypto_scalarmult/**/*"
-      - "original/src/libsodium/crypto_core/ed25519/**/*"
-      - "original/src/libsodium/crypto_sign/**/*"
-      - "original/src/libsodium/crypto_box/**/*"
+      - original/src/libsodium/crypto_scalarmult/
+      - original/src/libsodium/crypto_core/ed25519/
+      - original/src/libsodium/crypto_sign/
+      - original/src/libsodium/crypto_box/
       - original/src/libsodium/crypto_kx/crypto_kx.c
-      - original/debian/patches/CVE-2025-69277.patch
       - relevant_cves.json
-      - original/test/default/core_ed25519.c
+      - original/debian/patches/CVE-2025-69277.patch
+      - original/test/default/
       - original/test/default/xchacha20.c
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
+      - original/test/default/core_ed25519.c
   - order: 6
     id: check_safe_public_key
     type: check
     bounce_target: impl_safe_public_key
     required_preexisting_inputs:
       - safe/Cargo.toml
-      - safe/build.rs
-      - "safe/src/scalarmult/*.rs"
-      - safe/src/core/ed25519.rs
-      - safe/src/core/ristretto255.rs
-      - "safe/src/sign/*.rs"
-      - "safe/src/box_api/*.rs"
-      - safe/src/kx.rs
-      - safe/tests/ported_public_key.rs
-      - safe/tests/cve_2025_69277.rs
+      - safe/src/
+      - safe/cabi/expected/through_public_key.symbols
+      - safe/cabi/expected/upstream-kinds.tsv
       - safe/tools/check-symbols.sh
       - safe/tools/run-original-c-tests.sh
       - safe/tools/relink-original-objects.sh
-      - safe/cabi/expected/through_public_key.symbols
-      - safe/cabi/expected/upstream-kinds.tsv
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
-      - original/test/default/core_ed25519.c
-      - original/test/default/xchacha20.c
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
+      - safe/tests/ported_public_key.rs
+      - safe/tests/cve_2025_69277.rs
+      - safe/include/
+      - relevant_cves.json
+      - original/test/default/
   - order: 7
     id: impl_safe_pwhash_packaging
     type: implement
@@ -265,253 +206,7 @@ phases:
     required_preexisting_inputs:
       - safe/Cargo.toml
       - safe/build.rs
-      - safe/src/lib.rs
-      - safe/src/abi/mod.rs
-      - safe/src/abi/types.rs
-      - safe/src/ffi/mod.rs
-      - safe/src/ffi/helpers.rs
-      - "safe/src/foundation/*.rs"
-      - "safe/src/hash/*.rs"
-      - safe/src/generichash/mod.rs
-      - "safe/src/auth/*.rs"
-      - safe/src/onetimeauth/poly1305.rs
-      - "safe/src/stream/*.rs"
-      - "safe/src/core/*.rs"
-      - safe/src/secretbox/mod.rs
-      - safe/src/secretstream.rs
-      - safe/src/shorthash.rs
-      - safe/src/aead/chacha20poly1305.rs
-      - safe/src/aead/xchacha20poly1305.rs
-      - "safe/src/scalarmult/*.rs"
-      - "safe/src/sign/*.rs"
-      - "safe/src/box_api/*.rs"
-      - safe/src/kx.rs
-      - safe/cabi/libsodium.map
-      - safe/cabi/expected/full.symbols
-      - safe/cabi/expected/upstream-kinds.tsv
-      - safe/tools/check-symbols.sh
-      - safe/tools/run-original-c-tests.sh
-      - safe/tools/relink-original-objects.sh
-      - safe/tests/ported_public_key.rs
-      - safe/tests/cve_2025_69277.rs
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
-      - original/src/libsodium/include/sodium/crypto_pwhash.h
-      - original/src/libsodium/include/sodium/crypto_pwhash_argon2i.h
-      - original/src/libsodium/include/sodium/crypto_pwhash_argon2id.h
-      - original/src/libsodium/include/sodium/crypto_pwhash_scryptsalsa208sha256.h
-      - original/src/libsodium/include/sodium/crypto_kdf.h
-      - original/src/libsodium/include/sodium/crypto_kdf_blake2b.h
-      - original/src/libsodium/include/sodium/crypto_aead_aes256gcm.h
-      - "original/src/libsodium/crypto_pwhash/**/*"
-      - "original/src/libsodium/crypto_kdf/**/*"
-      - "original/src/libsodium/crypto_aead/aes256gcm/**/*"
-      - original/debian/control
-      - original/debian/rules
-      - original/debian/libsodium23.install
-      - original/debian/libsodium-dev.install
-      - original/debian/libsodium23.symbols
-      - original/libsodium.pc.in
-      - original/test/default/keygen.c
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
-  - order: 8
-    id: check_safe_pwhash_packaging
-    type: check
-    bounce_target: impl_safe_pwhash_packaging
-    required_preexisting_inputs:
-      - safe/Cargo.toml
-      - safe/build.rs
-      - "safe/src/pwhash/*.rs"
-      - safe/src/kdf.rs
-      - safe/src/aead/aes256gcm.rs
-      - safe/tests/ported_pwhash.rs
-      - safe/debian/control
-      - safe/debian/rules
-      - safe/debian/changelog
-      - safe/debian/source/format
-      - safe/debian/libsodium23.install
-      - safe/debian/libsodium-dev.install
-      - safe/debian/libsodium23.symbols
-      - safe/packaging/libsodium.pc.in
-      - safe/tools/build-deb.sh
-      - safe/tools/check-symbols.sh
-      - safe/tools/run-original-c-tests.sh
-      - safe/tools/relink-original-objects.sh
-      - safe/cabi/expected/full.symbols
-      - safe/cabi/expected/upstream-kinds.tsv
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
-      - original/test/default/keygen.c
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
-  - order: 9
-    id: impl_safe_harness
-    type: implement
-    bounce_target: null
-    required_preexisting_inputs:
-      - safe/Cargo.toml
-      - safe/build.rs
-      - safe/src/lib.rs
-      - "safe/src/abi/*.rs"
-      - "safe/src/ffi/*.rs"
-      - "safe/src/foundation/*.rs"
-      - "safe/src/hash/*.rs"
-      - safe/src/generichash/mod.rs
-      - "safe/src/auth/*.rs"
-      - "safe/src/onetimeauth/*.rs"
-      - "safe/src/stream/*.rs"
-      - "safe/src/core/*.rs"
-      - "safe/src/secretbox/*.rs"
-      - safe/src/secretstream.rs
-      - safe/src/shorthash.rs
-      - "safe/src/aead/*.rs"
-      - "safe/src/scalarmult/*.rs"
-      - "safe/src/sign/*.rs"
-      - "safe/src/box_api/*.rs"
-      - safe/src/kx.rs
-      - "safe/src/pwhash/*.rs"
-      - safe/src/kdf.rs
-      - safe/tests/abi_layout.rs
-      - safe/tests/abi_symbols.rs
-      - safe/tests/ported_foundation.rs
-      - safe/tests/ported_symmetric.rs
-      - safe/tests/ported_public_key.rs
-      - safe/tests/cve_2025_69277.rs
-      - safe/tests/ported_pwhash.rs
-      - safe/debian/control
-      - safe/debian/rules
-      - safe/debian/changelog
-      - safe/debian/source/format
-      - safe/debian/libsodium23.install
-      - safe/debian/libsodium-dev.install
-      - safe/debian/libsodium23.symbols
-      - safe/packaging/libsodium.pc.in
-      - safe/tools/build-deb.sh
-      - safe/tools/check-symbols.sh
-      - safe/tools/run-original-c-tests.sh
-      - safe/tools/relink-original-objects.sh
-      - safe/cabi/expected/full.symbols
-      - safe/cabi/expected/upstream-kinds.tsv
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
-      - test-original.sh
-      - dependents.json
-      - original/test/default/Makefile.am
-      - original/test/default/misuse.c
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
-  - order: 10
-    id: check_safe_harness
-    type: check
-    bounce_target: impl_safe_harness
-    required_preexisting_inputs:
-      - safe/Cargo.toml
-      - safe/build.rs
-      - safe/src/lib.rs
-      - "safe/src/abi/*.rs"
-      - "safe/src/ffi/*.rs"
-      - "safe/src/foundation/*.rs"
-      - "safe/src/hash/*.rs"
-      - safe/src/generichash/mod.rs
-      - "safe/src/auth/*.rs"
-      - "safe/src/onetimeauth/*.rs"
-      - "safe/src/stream/*.rs"
-      - "safe/src/core/*.rs"
-      - "safe/src/secretbox/*.rs"
-      - safe/src/secretstream.rs
-      - safe/src/shorthash.rs
-      - "safe/src/aead/*.rs"
-      - "safe/src/scalarmult/*.rs"
-      - "safe/src/sign/*.rs"
-      - "safe/src/box_api/*.rs"
-      - safe/src/kx.rs
-      - "safe/src/pwhash/*.rs"
-      - safe/src/kdf.rs
-      - safe/tests/abi_layout.rs
-      - safe/tests/abi_symbols.rs
-      - safe/tests/ported_foundation.rs
-      - safe/tests/ported_symmetric.rs
-      - safe/tests/ported_public_key.rs
-      - safe/tests/cve_2025_69277.rs
-      - safe/tests/ported_pwhash.rs
-      - safe/tests/ported_all.rs
-      - safe/debian/control
-      - safe/debian/rules
-      - safe/debian/changelog
-      - safe/debian/source/format
-      - safe/debian/libsodium23.install
-      - safe/debian/libsodium-dev.install
-      - safe/debian/libsodium23.symbols
-      - safe/packaging/libsodium.pc.in
-      - safe/tools/run-full-compat.sh
-      - safe/tools/build-deb.sh
-      - safe/tools/check-symbols.sh
-      - safe/tools/run-original-c-tests.sh
-      - safe/tools/relink-original-objects.sh
-      - safe/cabi/expected/full.symbols
-      - safe/cabi/expected/upstream-kinds.tsv
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
-      - test-original.sh
-      - dependents.json
-      - original/test/default/Makefile.am
-      - original/test/default/misuse.c
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
-  - order: 11
-    id: impl_safe_final_hardening
-    type: implement
-    bounce_target: null
-    required_preexisting_inputs:
-      - safe/Cargo.toml
-      - safe/build.rs
-      - safe/src/lib.rs
-      - "safe/src/abi/*.rs"
-      - "safe/src/ffi/*.rs"
-      - "safe/src/foundation/*.rs"
-      - "safe/src/hash/*.rs"
-      - safe/src/generichash/mod.rs
-      - "safe/src/auth/*.rs"
-      - "safe/src/onetimeauth/*.rs"
-      - "safe/src/stream/*.rs"
-      - "safe/src/core/*.rs"
-      - "safe/src/secretbox/*.rs"
-      - safe/src/secretstream.rs
-      - safe/src/shorthash.rs
-      - "safe/src/aead/*.rs"
-      - "safe/src/scalarmult/*.rs"
-      - "safe/src/sign/*.rs"
-      - "safe/src/box_api/*.rs"
-      - safe/src/kx.rs
-      - "safe/src/pwhash/*.rs"
-      - safe/src/kdf.rs
-      - safe/tests/abi_layout.rs
-      - safe/tests/abi_symbols.rs
-      - safe/tests/ported_foundation.rs
-      - safe/tests/ported_symmetric.rs
-      - safe/tests/ported_public_key.rs
-      - safe/tests/cve_2025_69277.rs
-      - safe/tests/ported_pwhash.rs
-      - safe/tests/ported_all.rs
-      - safe/debian/control
-      - safe/debian/rules
-      - safe/debian/changelog
-      - safe/debian/source/format
-      - safe/debian/libsodium23.install
-      - safe/debian/libsodium-dev.install
-      - safe/debian/libsodium23.symbols
-      - safe/packaging/libsodium.pc.in
-      - safe/tools/sync-upstream-interface.sh
-      - safe/tools/check-symbols.sh
-      - safe/tools/run-original-c-tests.sh
-      - safe/tools/relink-original-objects.sh
-      - safe/tools/build-deb.sh
-      - safe/tools/run-full-compat.sh
+      - safe/src/
       - safe/cabi/weak_runtime.c
       - safe/cabi/libsodium.map
       - safe/cabi/expected/foundation.symbols
@@ -519,8 +214,119 @@ phases:
       - safe/cabi/expected/through_public_key.symbols
       - safe/cabi/expected/full.symbols
       - safe/cabi/expected/upstream-kinds.tsv
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
+      - safe/tools/sync-upstream-interface.sh
+      - safe/tools/check-symbols.sh
+      - safe/tools/run-original-c-tests.sh
+      - safe/tools/relink-original-objects.sh
+      - safe/tests/
+      - safe/include/
+      - original/src/libsodium/include/sodium/crypto_pwhash.h
+      - original/src/libsodium/include/sodium/crypto_pwhash_argon2i.h
+      - original/src/libsodium/include/sodium/crypto_pwhash_argon2id.h
+      - original/src/libsodium/include/sodium/crypto_pwhash_scryptsalsa208sha256.h
+      - original/src/libsodium/include/sodium/crypto_kdf.h
+      - original/src/libsodium/include/sodium/crypto_kdf_blake2b.h
+      - original/src/libsodium/include/sodium/crypto_aead_aes256gcm.h
+      - original/src/libsodium/crypto_pwhash/
+      - original/src/libsodium/crypto_kdf/
+      - original/src/libsodium/crypto_aead/aes256gcm/
+      - original/debian/control
+      - original/debian/rules
+      - original/debian/libsodium23.install
+      - original/debian/libsodium-dev.install
+      - original/debian/libsodium23.symbols
+      - original/libsodium.pc.in
+      - original/src/libsodium/.libs/libsodium.so
+      - original/test/default/
+      - original/test/default/keygen.c
+  - order: 8
+    id: check_safe_pwhash_packaging
+    type: check
+    bounce_target: impl_safe_pwhash_packaging
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/src/
+      - safe/cabi/expected/full.symbols
+      - safe/cabi/expected/upstream-kinds.tsv
+      - safe/tools/check-symbols.sh
+      - safe/tools/run-original-c-tests.sh
+      - safe/tools/relink-original-objects.sh
+      - safe/tools/build-deb.sh
+      - safe/tests/ported_pwhash.rs
+      - safe/debian/
+      - safe/packaging/libsodium.pc.in
+      - safe/include/
+      - original/test/default/
+  - order: 9
+    id: impl_safe_harness
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/src/
+      - safe/cabi/weak_runtime.c
+      - safe/cabi/libsodium.map
+      - safe/cabi/expected/foundation.symbols
+      - safe/cabi/expected/through_symmetric.symbols
+      - safe/cabi/expected/through_public_key.symbols
+      - safe/cabi/expected/full.symbols
+      - safe/cabi/expected/upstream-kinds.tsv
+      - safe/tools/
+      - safe/tests/
+      - safe/include/
+      - safe/debian/
+      - safe/packaging/libsodium.pc.in
+      - test-original.sh
+      - dependents.json
+      - original/test/default/Makefile.am
+      - original/test/default/
+      - original/test/default/hash2.exp
+  - order: 10
+    id: check_safe_harness
+    type: check
+    bounce_target: impl_safe_harness
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/src/
+      - safe/cabi/expected/full.symbols
+      - safe/cabi/expected/upstream-kinds.tsv
+      - safe/tools/check-symbols.sh
+      - safe/tools/run-original-c-tests.sh
+      - safe/tools/relink-original-objects.sh
+      - safe/tools/build-deb.sh
+      - safe/tools/run-full-compat.sh
+      - safe/tests/ported_all.rs
+      - safe/debian/
+      - safe/packaging/libsodium.pc.in
+      - safe/include/
+      - test-original.sh
+      - dependents.json
+      - original/test/default/Makefile.am
+      - original/test/default/
+      - original/test/default/hash2.exp
+  - order: 11
+    id: impl_safe_final_hardening
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/src/
+      - safe/cabi/weak_runtime.c
+      - safe/cabi/libsodium.map
+      - safe/cabi/expected/foundation.symbols
+      - safe/cabi/expected/through_symmetric.symbols
+      - safe/cabi/expected/through_public_key.symbols
+      - safe/cabi/expected/full.symbols
+      - safe/cabi/expected/upstream-kinds.tsv
+      - safe/tools/
+      - safe/tests/
+      - safe/include/
+      - safe/debian/
+      - safe/packaging/libsodium.pc.in
+      - test-original.sh
+      - original/src/libsodium/include/
       - original/src/libsodium/.libs/libsodium.so
       - original/debian/libsodium23.symbols
       - original/debian/control
@@ -528,16 +334,10 @@ phases:
       - original/debian/libsodium23.install
       - original/debian/libsodium-dev.install
       - original/debian/patches/CVE-2025-69277.patch
-      - original/src/libsodium/include/sodium.h
-      - "original/src/libsodium/include/sodium/*.h"
-      - original/test/default/Makefile.am
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
+      - original/test/default/
       - original/test/default/test-suite.log
       - relevant_cves.json
       - dependents.json
-      - test-original.sh
   - order: 12
     id: check_safe_final_hardening
     type: check
@@ -545,56 +345,21 @@ phases:
     required_preexisting_inputs:
       - safe/Cargo.toml
       - safe/build.rs
-      - safe/src/lib.rs
-      - "safe/src/abi/*.rs"
-      - "safe/src/ffi/*.rs"
-      - "safe/src/foundation/*.rs"
-      - "safe/src/hash/*.rs"
-      - safe/src/generichash/mod.rs
-      - "safe/src/auth/*.rs"
-      - "safe/src/onetimeauth/*.rs"
-      - "safe/src/stream/*.rs"
-      - "safe/src/core/*.rs"
-      - "safe/src/secretbox/*.rs"
-      - safe/src/secretstream.rs
-      - safe/src/shorthash.rs
-      - "safe/src/aead/*.rs"
-      - "safe/src/scalarmult/*.rs"
-      - "safe/src/sign/*.rs"
-      - "safe/src/box_api/*.rs"
-      - safe/src/kx.rs
-      - "safe/src/pwhash/*.rs"
-      - safe/src/kdf.rs
-      - safe/tests/abi_layout.rs
-      - safe/tests/abi_symbols.rs
-      - safe/tests/ported_foundation.rs
-      - safe/tests/ported_symmetric.rs
-      - safe/tests/ported_public_key.rs
-      - safe/tests/cve_2025_69277.rs
-      - safe/tests/ported_pwhash.rs
-      - safe/tests/ported_all.rs
-      - safe/debian/control
-      - safe/debian/rules
-      - safe/debian/changelog
-      - safe/debian/source/format
-      - safe/debian/libsodium23.install
-      - safe/debian/libsodium-dev.install
-      - safe/debian/libsodium23.symbols
-      - safe/packaging/libsodium.pc.in
-      - safe/tools/check-symbols.sh
-      - safe/tools/run-original-c-tests.sh
-      - safe/tools/relink-original-objects.sh
-      - safe/tools/build-deb.sh
+      - safe/src/
+      - safe/cabi/weak_runtime.c
+      - safe/cabi/libsodium.map
       - safe/cabi/expected/full.symbols
       - safe/cabi/expected/upstream-kinds.tsv
-      - safe/include/sodium.h
-      - "safe/include/sodium/*.h"
+      - safe/tools/
+      - safe/tests/
+      - safe/include/
+      - safe/debian/
+      - safe/packaging/libsodium.pc.in
       - test-original.sh
-      - dependents.json
-      - original/test/default/Makefile.am
-      - "original/test/default/*.c"
-      - "original/test/default/*.o"
-      - "original/test/default/*.exp"
       - original/src/libsodium/.libs/libsodium.so
       - original/debian/libsodium23.symbols
+      - original/debian/patches/CVE-2025-69277.patch
+      - original/test/default/
+      - original/test/default/test-suite.log
       - relevant_cves.json
+      - dependents.json

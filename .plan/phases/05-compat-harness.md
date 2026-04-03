@@ -7,58 +7,9 @@ Full compatibility harness and Rust test port completion
 `impl_safe_harness`
 
 ## Preexisting Inputs
-- `safe/Cargo.toml`
-- `safe/build.rs`
-- `safe/src/lib.rs`
-- `safe/src/abi/*.rs`
-- `safe/src/ffi/*.rs`
-- `safe/src/foundation/*.rs`
-- `safe/src/hash/*.rs`
-- `safe/src/generichash/mod.rs`
-- `safe/src/auth/*.rs`
-- `safe/src/onetimeauth/*.rs`
-- `safe/src/stream/*.rs`
-- `safe/src/core/*.rs`
-- `safe/src/secretbox/*.rs`
-- `safe/src/secretstream.rs`
-- `safe/src/shorthash.rs`
-- `safe/src/aead/*.rs`
-- `safe/src/scalarmult/*.rs`
-- `safe/src/sign/*.rs`
-- `safe/src/box_api/*.rs`
-- `safe/src/kx.rs`
-- `safe/src/pwhash/*.rs`
-- `safe/src/kdf.rs`
-- `safe/tests/abi_layout.rs`
-- `safe/tests/abi_symbols.rs`
-- `safe/tests/ported_foundation.rs`
-- `safe/tests/ported_symmetric.rs`
-- `safe/tests/ported_public_key.rs`
-- `safe/tests/cve_2025_69277.rs`
-- `safe/tests/ported_pwhash.rs`
-- `safe/debian/control`
-- `safe/debian/rules`
-- `safe/debian/changelog`
-- `safe/debian/source/format`
-- `safe/debian/libsodium23.install`
-- `safe/debian/libsodium-dev.install`
-- `safe/debian/libsodium23.symbols`
-- `safe/packaging/libsodium.pc.in`
-- `safe/tools/build-deb.sh`
-- `safe/tools/check-symbols.sh`
-- `safe/tools/run-original-c-tests.sh`
-- `safe/tools/relink-original-objects.sh`
-- `safe/cabi/expected/full.symbols`
-- `safe/cabi/expected/upstream-kinds.tsv`
-- `safe/include/sodium.h`
-- `safe/include/sodium/*.h`
-- `test-original.sh`
-- `dependents.json`
-- `original/test/default/Makefile.am`
-- `original/test/default/misuse.c`
-- `original/test/default/*.c`
-- `original/test/default/*.o`
-- `original/test/default/*.exp`
+- Phase 1 through phase 4 outputs expected to exist: `safe/Cargo.toml`, `safe/build.rs`, `safe/src/lib.rs`, `safe/src/abi/mod.rs`, `safe/src/abi/types.rs`, `safe/src/ffi/mod.rs`, `safe/src/ffi/helpers.rs`, `safe/src/foundation/core.rs`, `safe/src/foundation/runtime.rs`, `safe/src/foundation/randombytes.rs`, `safe/src/foundation/utils.rs`, `safe/src/foundation/codecs.rs`, `safe/src/foundation/version.rs`, `safe/src/foundation/verify.rs`, `safe/src/hash/mod.rs`, `safe/src/hash/sha256.rs`, `safe/src/hash/sha512.rs`, `safe/src/generichash/mod.rs`, `safe/src/auth/mod.rs`, `safe/src/auth/hmacsha256.rs`, `safe/src/auth/hmacsha512.rs`, `safe/src/auth/hmacsha512256.rs`, `safe/src/onetimeauth/poly1305.rs`, `safe/src/stream/chacha20.rs`, `safe/src/stream/salsa20.rs`, `safe/src/stream/salsa2012.rs`, `safe/src/stream/salsa208.rs`, `safe/src/stream/xsalsa20.rs`, `safe/src/stream/xchacha20.rs`, `safe/src/core/hsalsa20.rs`, `safe/src/core/hchacha20.rs`, `safe/src/core/salsa.rs`, `safe/src/core/ed25519.rs`, `safe/src/core/ristretto255.rs`, `safe/src/secretbox/mod.rs`, `safe/src/secretstream.rs`, `safe/src/shorthash.rs`, `safe/src/aead/chacha20poly1305.rs`, `safe/src/aead/xchacha20poly1305.rs`, `safe/src/aead/aes256gcm.rs`, `safe/src/scalarmult/mod.rs`, `safe/src/scalarmult/curve25519.rs`, `safe/src/scalarmult/ed25519.rs`, `safe/src/scalarmult/ristretto255.rs`, `safe/src/sign/mod.rs`, `safe/src/sign/ed25519.rs`, `safe/src/sign/legacy_edwards25519sha512batch.rs`, `safe/src/box_api/mod.rs`, `safe/src/box_api/curve25519xsalsa20poly1305.rs`, `safe/src/box_api/curve25519xchacha20poly1305.rs`, `safe/src/kx.rs`, `safe/src/pwhash/mod.rs`, `safe/src/pwhash/argon2.rs`, `safe/src/pwhash/scrypt.rs`, `safe/src/kdf.rs`, `safe/cabi/weak_runtime.c`, `safe/cabi/libsodium.map`, `safe/cabi/expected/foundation.symbols`, `safe/cabi/expected/through_symmetric.symbols`, `safe/cabi/expected/through_public_key.symbols`, `safe/cabi/expected/full.symbols`, `safe/cabi/expected/upstream-kinds.tsv`, `safe/tools/sync-upstream-interface.sh`, `safe/tools/check-symbols.sh`, `safe/tools/run-original-c-tests.sh`, `safe/tools/relink-original-objects.sh`, `safe/tools/build-deb.sh`, `safe/tests/abi_layout.rs`, `safe/tests/abi_symbols.rs`, `safe/tests/ported_foundation.rs`, `safe/tests/ported_symmetric.rs`, `safe/tests/ported_public_key.rs`, `safe/tests/cve_2025_69277.rs`, `safe/tests/ported_pwhash.rs`, `safe/include/sodium.h`, `safe/debian/control`, `safe/debian/rules`, `safe/debian/changelog`, `safe/debian/source/format`, `safe/debian/libsodium23.install`, `safe/debian/libsodium-dev.install`, `safe/debian/libsodium23.symbols`, and `safe/packaging/libsodium.pc.in`
+- Existing top-level harness inputs that must be preserved in place: `test-original.sh`, `dependents.json`, `original/test/default/Makefile.am`, `original/test/default/test-suite.log`, and `original/test/default/hash2.exp`
+- Existing full test corpus that `--all` must consume in place: `original/test/default/aead_aes256gcm.c`, `original/test/default/aead_aes256gcm.exp`, `original/test/default/aead_aes256gcm.o`, `original/test/default/aead_aes256gcm2.c`, `original/test/default/aead_aes256gcm2.exp`, `original/test/default/aead_aes256gcm2.o`, `original/test/default/aead_chacha20poly1305.c`, `original/test/default/aead_chacha20poly1305.exp`, `original/test/default/aead_chacha20poly1305.o`, `original/test/default/aead_chacha20poly13052.c`, `original/test/default/aead_chacha20poly13052.exp`, `original/test/default/aead_chacha20poly13052.o`, `original/test/default/aead_xchacha20poly1305.c`, `original/test/default/aead_xchacha20poly1305.exp`, `original/test/default/aead_xchacha20poly1305.o`, `original/test/default/auth.c`, `original/test/default/auth.exp`, `original/test/default/auth.o`, `original/test/default/auth2.c`, `original/test/default/auth2.exp`, `original/test/default/auth2.o`, `original/test/default/auth3.c`, `original/test/default/auth3.exp`, `original/test/default/auth3.o`, `original/test/default/auth5.c`, `original/test/default/auth5.exp`, `original/test/default/auth5.o`, `original/test/default/auth6.c`, `original/test/default/auth6.exp`, `original/test/default/auth6.o`, `original/test/default/auth7.c`, `original/test/default/auth7.exp`, `original/test/default/auth7.o`, `original/test/default/box.c`, `original/test/default/box.exp`, `original/test/default/box.o`, `original/test/default/box2.c`, `original/test/default/box2.exp`, `original/test/default/box2.o`, `original/test/default/box7.c`, `original/test/default/box7.exp`, `original/test/default/box7.o`, `original/test/default/box8.c`, `original/test/default/box8.exp`, `original/test/default/box8.o`, `original/test/default/box_easy.c`, `original/test/default/box_easy.exp`, `original/test/default/box_easy.o`, `original/test/default/box_easy2.c`, `original/test/default/box_easy2.exp`, `original/test/default/box_easy2.o`, `original/test/default/box_seal.c`, `original/test/default/box_seal.exp`, `original/test/default/box_seal.o`, `original/test/default/box_seed.c`, `original/test/default/box_seed.exp`, `original/test/default/box_seed.o`, `original/test/default/chacha20.c`, `original/test/default/chacha20.exp`, `original/test/default/chacha20.o`, `original/test/default/codecs.c`, `original/test/default/codecs.exp`, `original/test/default/codecs.o`, `original/test/default/core1.c`, `original/test/default/core1.exp`, `original/test/default/core1.o`, `original/test/default/core2.c`, `original/test/default/core2.exp`, `original/test/default/core2.o`, `original/test/default/core3.c`, `original/test/default/core3.exp`, `original/test/default/core3.o`, `original/test/default/core4.c`, `original/test/default/core4.exp`, `original/test/default/core4.o`, `original/test/default/core5.c`, `original/test/default/core5.exp`, `original/test/default/core5.o`, `original/test/default/core6.c`, `original/test/default/core6.exp`, `original/test/default/core6.o`, `original/test/default/core_ed25519.c`, `original/test/default/core_ed25519.exp`, `original/test/default/core_ed25519.o`, `original/test/default/core_ristretto255.c`, `original/test/default/core_ristretto255.exp`, `original/test/default/core_ristretto255.o`, `original/test/default/ed25519_convert.c`, `original/test/default/ed25519_convert.exp`, `original/test/default/ed25519_convert.o`, `original/test/default/generichash.c`, `original/test/default/generichash.exp`, `original/test/default/generichash.o`, `original/test/default/generichash2.c`, `original/test/default/generichash2.exp`, `original/test/default/generichash2.o`, `original/test/default/generichash3.c`, `original/test/default/generichash3.exp`, `original/test/default/generichash3.o`, `original/test/default/hash.c`, `original/test/default/hash.exp`, `original/test/default/hash.o`, `original/test/default/hash3.c`, `original/test/default/hash3.exp`, `original/test/default/hash3.o`, `original/test/default/kdf.c`, `original/test/default/kdf.exp`, `original/test/default/kdf.o`, `original/test/default/keygen.c`, `original/test/default/keygen.exp`, `original/test/default/keygen.o`, `original/test/default/kx.c`, `original/test/default/kx.exp`, `original/test/default/kx.o`, `original/test/default/metamorphic.c`, `original/test/default/metamorphic.exp`, `original/test/default/metamorphic.o`, `original/test/default/misuse.c`, `original/test/default/misuse.exp`, `original/test/default/misuse.o`, `original/test/default/onetimeauth.c`, `original/test/default/onetimeauth.exp`, `original/test/default/onetimeauth.o`, `original/test/default/onetimeauth2.c`, `original/test/default/onetimeauth2.exp`, `original/test/default/onetimeauth2.o`, `original/test/default/onetimeauth7.c`, `original/test/default/onetimeauth7.exp`, `original/test/default/onetimeauth7.o`, `original/test/default/pwhash_argon2i.c`, `original/test/default/pwhash_argon2i.exp`, `original/test/default/pwhash_argon2i.o`, `original/test/default/pwhash_argon2id.c`, `original/test/default/pwhash_argon2id.exp`, `original/test/default/pwhash_argon2id.o`, `original/test/default/pwhash_scrypt.c`, `original/test/default/pwhash_scrypt.exp`, `original/test/default/pwhash_scrypt.o`, `original/test/default/pwhash_scrypt_ll.c`, `original/test/default/pwhash_scrypt_ll.exp`, `original/test/default/pwhash_scrypt_ll.o`, `original/test/default/randombytes.c`, `original/test/default/randombytes.exp`, `original/test/default/randombytes.o`, `original/test/default/scalarmult.c`, `original/test/default/scalarmult.exp`, `original/test/default/scalarmult.o`, `original/test/default/scalarmult2.c`, `original/test/default/scalarmult2.exp`, `original/test/default/scalarmult2.o`, `original/test/default/scalarmult5.c`, `original/test/default/scalarmult5.exp`, `original/test/default/scalarmult5.o`, `original/test/default/scalarmult6.c`, `original/test/default/scalarmult6.exp`, `original/test/default/scalarmult6.o`, `original/test/default/scalarmult7.c`, `original/test/default/scalarmult7.exp`, `original/test/default/scalarmult7.o`, `original/test/default/scalarmult8.c`, `original/test/default/scalarmult8.exp`, `original/test/default/scalarmult8.o`, `original/test/default/scalarmult_ed25519.c`, `original/test/default/scalarmult_ed25519.exp`, `original/test/default/scalarmult_ed25519.o`, `original/test/default/scalarmult_ristretto255.c`, `original/test/default/scalarmult_ristretto255.exp`, `original/test/default/scalarmult_ristretto255.o`, `original/test/default/secretbox.c`, `original/test/default/secretbox.exp`, `original/test/default/secretbox.o`, `original/test/default/secretbox2.c`, `original/test/default/secretbox2.exp`, `original/test/default/secretbox2.o`, `original/test/default/secretbox7.c`, `original/test/default/secretbox7.exp`, `original/test/default/secretbox7.o`, `original/test/default/secretbox8.c`, `original/test/default/secretbox8.exp`, `original/test/default/secretbox8.o`, `original/test/default/secretbox_easy.c`, `original/test/default/secretbox_easy.exp`, `original/test/default/secretbox_easy.o`, `original/test/default/secretbox_easy2.c`, `original/test/default/secretbox_easy2.exp`, `original/test/default/secretbox_easy2.o`, `original/test/default/secretstream.c`, `original/test/default/secretstream.exp`, `original/test/default/secretstream.o`, `original/test/default/shorthash.c`, `original/test/default/shorthash.exp`, `original/test/default/shorthash.o`, `original/test/default/sign.c`, `original/test/default/sign.exp`, `original/test/default/sign.o`, `original/test/default/siphashx24.c`, `original/test/default/siphashx24.exp`, `original/test/default/siphashx24.o`, `original/test/default/sodium_core.c`, `original/test/default/sodium_core.exp`, `original/test/default/sodium_core.o`, `original/test/default/sodium_utils.c`, `original/test/default/sodium_utils.exp`, `original/test/default/sodium_utils.o`, `original/test/default/sodium_utils2.c`, `original/test/default/sodium_utils2.exp`, `original/test/default/sodium_utils2.o`, `original/test/default/sodium_utils3.c`, `original/test/default/sodium_utils3.exp`, `original/test/default/sodium_utils3.o`, `original/test/default/sodium_version.c`, `original/test/default/sodium_version.exp`, `original/test/default/sodium_version.o`, `original/test/default/stream.c`, `original/test/default/stream.exp`, `original/test/default/stream.o`, `original/test/default/stream2.c`, `original/test/default/stream2.exp`, `original/test/default/stream2.o`, `original/test/default/stream3.c`, `original/test/default/stream3.exp`, `original/test/default/stream3.o`, `original/test/default/stream4.c`, `original/test/default/stream4.exp`, `original/test/default/stream4.o`, `original/test/default/verify1.c`, `original/test/default/verify1.exp`, `original/test/default/verify1.o`, `original/test/default/xchacha20.c`, `original/test/default/xchacha20.exp`, and `original/test/default/xchacha20.o`
 
 ## New Outputs
 - Completed Rust ports of the full upstream test suite
@@ -67,51 +18,49 @@ Full compatibility harness and Rust test port completion
 
 ## File Changes
 - Modify `test-original.sh`
-- Create `safe/tests/ported_all.rs` or expand it if a partial stub already exists
+- Create or expand `safe/tests/ported_all.rs` as the stable top-level integration-test entry point for the remaining upstream test ports
 - Create `safe/tools/run-full-compat.sh`
 
 ## Implementation Details
-- Change the root harness from building upstream under `/usr/local` to building and installing safe `.deb` packages.
-- Keep `--mode original` as an escape hatch for baseline comparisons, but make the safe package path the default verification target.
+- Change the root harness from “build upstream under `/usr/local`” to “build and install safe `.deb` packages”. Keep `--mode original` as an escape hatch for baseline comparisons, but make the safe package path the default verification target.
 - Add `--mode safe|original` parsing and help text to `test-original.sh`. Do not create a separate harness.
-- In `--mode safe`, build the local packages after the apt dependencies are installed, install them with `dpkg -i`, and prove that the archive `libsodium23` and `libsodium-dev` packages were upgraded in place.
-- Do not rely on `/usr/local`, `LD_LIBRARY_PATH`, or `PKG_CONFIG_PATH` shadowing in safe mode.
-- Replace the current `/usr/local`-specific assertions with checks against `dpkg -L libsodium23`, `pkg-config --variable=libdir libsodium`, and `ldconfig -p`.
-- Add the Debian packaging prerequisites to the Docker image build in `test-original.sh`.
-- Preserve the dependent inventory and ordering in `dependents.json`. Do not modify that file or replace it with a new discovery pass.
-- Finish porting the remaining upstream C tests into Rust integration tests. This phase must explicitly port `original/test/default/misuse.c`.
-- Make `run-original-c-tests.sh --all` and `relink-original-objects.sh --all` cover the actual 77 runnable tests and 77 prebuilt `.o` files, including `xchacha20`, `keygen`, `metamorphic`, and `misuse`, and excluding nonexistent artifacts such as `hash2`.
-- Resolve the active `!EMSCRIPTEN` and `!MINIMAL` additions from `original/test/default/Makefile.am` before intersecting with the current `.c` and `.o` files.
+- In `--mode safe`, build the local packages after the apt dependencies are installed, install them with `dpkg -i`, and prove that the archive `libsodium23` and `libsodium-dev` packages were upgraded in place. Do not rely on `/usr/local`, `LD_LIBRARY_PATH`, or `PKG_CONFIG_PATH` shadowing in safe mode.
+- Replace the current `/usr/local`-specific assertions in `test-original.sh` with checks against the package-installed library path from `dpkg -L libsodium23`, `pkg-config --variable=libdir libsodium`, and `ldconfig -p`.
+- Add the Debian packaging prerequisites to the Docker image build in `test-original.sh`, including the tools needed to build `safe/debian`.
+- Preserve the dependent inventory in `dependents.json`. Do not modify that file or replace it with a new discovery pass; the harness already asserts the exact `.dependents[].package` inventory and order.
+- Finish porting the remaining upstream C tests into Rust integration tests. This phase must explicitly port `original/test/default/misuse.c` because it is the remaining intentional cross-family test that spans `randombytes_buf_deterministic`, `crypto_kx_*`, `crypto_aead_*`, `crypto_box_*`, `crypto_pwhash_*`, and codec/memory helpers.
+- `run-original-c-tests.sh --all` and `relink-original-objects.sh --all` must cover the actual 77 runnable tests and 77 prebuilt `.o` files, including `xchacha20`, `keygen`, `metamorphic`, and `misuse`, and excluding nonexistent artifacts such as `hash2`. Resolve the active `!EMSCRIPTEN` and `!MINIMAL` additions from `original/test/default/Makefile.am` before intersecting with the current `.c` and `.o` files.
 - Build the safe package from a writable repo copy inside Docker, such as `/tmp/libsodium-safe` copied from `/work`, so `safe/` and `original/` remain available together if the safe build still consumes synced upstream interface artifacts.
-- Reuse the existing dependent smoke-test functions in `test-original.sh`, updating only the build and install path plus library-resolution assertions rather than replacing the package-specific checks.
-- Preserve the phase-4 full ABI, `safe/debian/libsodium23.symbols`, and `safe/packaging/libsodium.pc.in` unchanged unless work bounces back to regenerate those synced derivatives from the upstream artifacts.
+- Reuse the existing dependent smoke-test functions in `test-original.sh` through line 723, updating only the build/install path and the library-resolution assertions rather than replacing their package-specific checks.
+- `safe/tools/run-full-compat.sh` must orchestrate the package build, `--all` source-compat checks, `--all` relink checks, and the safe-mode dependent smoke tests without changing the authoritative dependent inventory or test selection rules.
 
 ## Verification Phases
-- `Phase ID`: `check_safe_harness`
-- `Type`: `check`
-- `bounce_target`: `impl_safe_harness`
-- `Purpose`: Verify that the root Docker harness now installs the Rust-built replacement package, that the ported Rust tests cover the full upstream suite, and that representative dependent compile-time and runtime smoke tests pass through the package-install path.
-- `Commands`:
-```bash
-cargo build --manifest-path safe/Cargo.toml --release
-cargo test --manifest-path safe/Cargo.toml --all-targets
-./safe/tools/run-original-c-tests.sh --all
-./safe/tools/relink-original-objects.sh --all
-./safe/tools/check-symbols.sh --expected safe/cabi/expected/full.symbols --kinds safe/cabi/expected/upstream-kinds.tsv safe/target/release/libsodium.so
-./test-original.sh --mode safe --only librust-libsodium-sys-dev
-./test-original.sh --mode safe --only libtoxcore-dev
-./test-original.sh --mode safe --only libzmq3-dev
-./test-original.sh --mode safe --only minisign
-./test-original.sh --mode safe --only libzmq5
-./test-original.sh --mode safe --only python3-nacl
-```
+### `check_safe_harness`
+Type: `check`
+
+Bounce Target: `impl_safe_harness`
+
+Purpose: Verify that the root Docker harness now installs the Rust-built replacement package, that the ported Rust tests cover the full upstream suite, and that representative dependent compile-time and runtime smoke tests pass through the package-install path.
+
+Commands:
+- `cargo build --manifest-path safe/Cargo.toml --release`
+- `cargo test --manifest-path safe/Cargo.toml --all-targets`
+- `./safe/tools/run-original-c-tests.sh --all`
+- `./safe/tools/relink-original-objects.sh --all`
+- `./safe/tools/check-symbols.sh --expected safe/cabi/expected/full.symbols --kinds safe/cabi/expected/upstream-kinds.tsv safe/target/release/libsodium.so`
+- `./test-original.sh --mode safe --only librust-libsodium-sys-dev`
+- `./test-original.sh --mode safe --only libtoxcore-dev`
+- `./test-original.sh --mode safe --only libzmq3-dev`
+- `./test-original.sh --mode safe --only minisign`
+- `./test-original.sh --mode safe --only libzmq5`
+- `./test-original.sh --mode safe --only python3-nacl`
 
 ## Success Criteria
-- The modified harness installs the safe package rather than using `/usr/local` shadowing
-- Representative compile-time and runtime dependents succeed through the package-install path
-- The full legacy C test suite passes both from source and from relinked upstream object files
-- `misuse` is included in the `--all` suite and its abort-driven behavior passes under the safe library
-- The release artifact still matches `safe/cabi/expected/full.symbols` exactly after the harness and final test-port changes
+- The modified harness installs the safe package and representative compile-time and runtime dependents succeed.
+- The full legacy C test suite now passes both from source and from relinked object files.
+- `misuse` is included in the `--all` suite and its abort-driven behavior passes under the safe library.
+- The release artifact still matches `safe/cabi/expected/full.symbols` exactly after the harness and test-port changes.
+- The generated `--all` inventory covers the real 77 runnable tests and 77 prebuilt `.o` files, includes `xchacha20`, `keygen`, `metamorphic`, and `misuse`, and excludes the orphan `hash2.exp`.
 
 ## Git Commit Requirement
-The implementer must commit work to git before yielding.
+The implementer must commit phase 5 work to git before yielding.
