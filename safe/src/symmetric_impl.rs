@@ -1,8 +1,12 @@
 use crate::abi::types::*;
-use crate::ffi::helpers::{opt_slice, opt_slice_mut, static_cstr, write_opt};
+use crate::ffi::helpers::{opt_slice, opt_slice_mut, set_errno, static_cstr, write_opt};
 use crate::foundation::randombytes::fill_random_bytes;
-use argon2::{Algorithm as Argon2Algorithm, Argon2, Params as Argon2Params, Version as Argon2Version};
-use base64::Engine as _;
+use argon2::{
+    password_hash::{
+        phc::PasswordHash as PhcPasswordHash, PasswordHasher as _, PasswordVerifier as _,
+    },
+    Algorithm as Argon2Algorithm, Argon2, Params as Argon2Params, Version as Argon2Version,
+};
 use blake2b_simd::{Params as Blake2bParams, State as Blake2bState};
 use chacha20::cipher::{KeyIvInit as _, StreamCipher as _, StreamCipherSeek as _};
 use chacha20::{ChaCha20, ChaCha20Legacy};
@@ -12,6 +16,7 @@ use core::hash::Hasher;
 use core::mem::size_of;
 use core::ptr;
 use salsa20::{Salsa12, Salsa20, Salsa8, XSalsa20};
+use scrypt::Params as ScryptParams;
 use sha2::block_api::{compress256, compress512};
 use siphasher::sip::SipHasher24;
 use siphasher::sip128::{Hasher128 as _, SipHasher24 as SipHasher12824};
@@ -62,6 +67,11 @@ const AEAD_CHACHA20_IETF_NONCEBYTES: usize = 12;
 const AEAD_XCHACHA20_NONCEBYTES: usize = 24;
 const AES256GCM_KEYBYTES: usize = 32;
 const AES256GCM_NONCEBYTES: usize = 12;
+const AES256GCM_MESSAGEBYTES_MAX: usize = if usize::BITS >= 37 {
+    68_719_476_704usize
+} else {
+    usize::MAX - AEAD_ABYTES
+};
 const KDF_BYTES_MIN: usize = 16;
 const KDF_BYTES_MAX: usize = 64;
 const KDF_CONTEXTBYTES: usize = 8;
@@ -97,6 +107,36 @@ const PWHASH_ARGON2ID_MEMLIMIT_SENSITIVE: usize = 1_073_741_824;
 const PWHASH_ALG_ARGON2I13: c_int = 1;
 const PWHASH_ALG_ARGON2ID13: c_int = 2;
 const PWHASH_ALG_DEFAULT: c_int = PWHASH_ALG_ARGON2ID13;
+const PWHASH_SCRYPT_BYTES_MIN: usize = 16;
+const PWHASH_SCRYPT_BYTES_MAX: usize = if usize::BITS >= 38 {
+    0x1fff_ffff_e0usize
+} else {
+    usize::MAX
+};
+const PWHASH_SCRYPT_SALTBYTES: usize = 32;
+const PWHASH_SCRYPT_STRBYTES: usize = 102;
+const PWHASH_SCRYPT_OPSLIMIT_MIN: u64 = 32_768;
+const PWHASH_SCRYPT_OPSLIMIT_MAX: u64 = 0xffff_ffff;
+const PWHASH_SCRYPT_MEMLIMIT_MIN: usize = 16_777_216;
+const PWHASH_SCRYPT_MEMLIMIT_MAX: usize = if usize::BITS >= 37 {
+    68_719_476_736usize
+} else {
+    usize::MAX
+};
+const PWHASH_SCRYPT_OPSLIMIT_INTERACTIVE: u64 = 524_288;
+const PWHASH_SCRYPT_MEMLIMIT_INTERACTIVE: usize = 16_777_216;
+const PWHASH_SCRYPT_OPSLIMIT_SENSITIVE: u64 = 33_554_432;
+const PWHASH_SCRYPT_MEMLIMIT_SENSITIVE: usize = 1_073_741_824;
+const PWHASH_SCRYPT_STRSETTINGBYTES: usize = 57;
+const PWHASH_SCRYPT_STRSALTBYTES: usize = 32;
+const PWHASH_SCRYPT_STRHASHBYTES: usize = 32;
+const SCRYPT_ITOA64: &[u8; 64] =
+    b"./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+unsafe extern "C" {
+    fn sodium_runtime_has_aesni() -> c_int;
+    fn sodium_runtime_has_pclmul() -> c_int;
+}
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -148,7 +188,8 @@ struct SecretstreamStateRepr {
 }
 
 const _: () = assert!(size_of::<Blake2bState>() < size_of::<crypto_generichash_blake2b_state>());
-const _: () = assert!(size_of::<Poly1305StateRepr>() <= size_of::<crypto_onetimeauth_poly1305_state>());
+const _: () =
+    assert!(size_of::<Poly1305StateRepr>() <= size_of::<crypto_onetimeauth_poly1305_state>());
 const BLAKE2B_STATE_FINALIZED_OFFSET: usize = size_of::<Blake2bState>();
 
 fn len_to_usize(len: u64) -> usize {
@@ -210,6 +251,29 @@ unsafe fn read_c_string(ptr: *const c_char) -> Option<String> {
     Some(std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned())
 }
 
+unsafe fn c_strnlen(ptr: *const c_char, max_len: usize) -> usize {
+    if ptr.is_null() {
+        return 0;
+    }
+    let bytes = ptr.cast::<u8>();
+    for i in 0..max_len {
+        if *bytes.add(i) == 0 {
+            return i;
+        }
+    }
+    max_len
+}
+
+unsafe fn zero_output(ptr: *mut u8, len: usize) {
+    if !ptr.is_null() && len != 0 {
+        opt_slice_mut(ptr, len).fill(0);
+    }
+}
+
+unsafe fn zero_char_output(ptr: *mut c_char, len: usize) {
+    zero_output(ptr.cast::<u8>(), len);
+}
+
 unsafe fn sha256_state(state: *mut crypto_hash_sha256_state) -> &'static mut Sha256StateRepr {
     &mut *(state.cast::<Sha256StateRepr>())
 }
@@ -230,9 +294,7 @@ unsafe fn hmac_sha512_state(
     &mut *(state.cast::<HmacSha512StateRepr>())
 }
 
-unsafe fn blake2b_state(
-    state: *mut crypto_generichash_blake2b_state,
-) -> &'static mut Blake2bState {
+unsafe fn blake2b_state(state: *mut crypto_generichash_blake2b_state) -> &'static mut Blake2bState {
     &mut *(state.cast::<Blake2bState>())
 }
 
@@ -262,13 +324,7 @@ unsafe fn secretstream_state(
 fn sha256_init_repr() -> Sha256StateRepr {
     Sha256StateRepr {
         state: [
-            0x6a09e667,
-            0xbb67ae85,
-            0x3c6ef372,
-            0xa54ff53a,
-            0x510e527f,
-            0x9b05688c,
-            0x1f83d9ab,
+            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
             0x5be0cd19,
         ],
         count: 0,
@@ -692,7 +748,13 @@ fn quarter_round_salsa(state: &mut [u32; 16], a: usize, b: usize, c: usize, d: u
     state[a] ^= state[d].wrapping_add(state[c]).rotate_left(18);
 }
 
-fn salsa_core_rounds(rounds: usize, out: &mut [u8; 64], input: &[u8; 16], key: &[u8; 32], c: &[u8; 16]) {
+fn salsa_core_rounds(
+    rounds: usize,
+    out: &mut [u8; 64],
+    input: &[u8; 16],
+    key: &[u8; 32],
+    c: &[u8; 16],
+) {
     let mut x = [0u32; 16];
     x[0] = u32::from_le_bytes(c[0..4].try_into().unwrap());
     x[5] = u32::from_le_bytes(c[4..8].try_into().unwrap());
@@ -792,11 +854,7 @@ fn hchacha20_core(input: &[u8; 16], key: &[u8; 32], c: &[u8; 16]) -> [u8; 32] {
     out
 }
 
-pub unsafe fn crypto_hash(
-    out: *mut u8,
-    in_: *const u8,
-    inlen: u64,
-) -> c_int {
+pub unsafe fn crypto_hash(out: *mut u8, in_: *const u8, inlen: u64) -> c_int {
     crypto_hash_sha512(out, in_, inlen)
 }
 
@@ -878,12 +936,7 @@ pub unsafe fn crypto_hash_sha512_update(
     0
 }
 
-pub unsafe fn crypto_auth(
-    out: *mut u8,
-    in_: *const u8,
-    inlen: u64,
-    k: *const u8,
-) -> c_int {
+pub unsafe fn crypto_auth(out: *mut u8, in_: *const u8, inlen: u64, k: *const u8) -> c_int {
     crypto_auth_hmacsha512256(out, in_, inlen, k)
 }
 
@@ -903,12 +956,7 @@ pub unsafe fn crypto_auth_primitive() -> *const c_char {
     static_cstr(b"hmacsha512256\0")
 }
 
-pub unsafe fn crypto_auth_verify(
-    h: *const u8,
-    in_: *const u8,
-    inlen: u64,
-    k: *const u8,
-) -> c_int {
+pub unsafe fn crypto_auth_verify(h: *const u8, in_: *const u8, inlen: u64, k: *const u8) -> c_int {
     crypto_auth_hmacsha512256_verify(h, in_, inlen, k)
 }
 
@@ -944,7 +992,10 @@ pub unsafe fn crypto_auth_hmacsha256_init(
     key: *const u8,
     keylen: usize,
 ) -> c_int {
-    ptr::write(state.cast::<HmacSha256StateRepr>(), hmac_sha256_init_repr(opt_slice(key, keylen)));
+    ptr::write(
+        state.cast::<HmacSha256StateRepr>(),
+        hmac_sha256_init_repr(opt_slice(key, keylen)),
+    );
     0
 }
 
@@ -965,7 +1016,10 @@ pub unsafe fn crypto_auth_hmacsha256_update(
     in_: *const u8,
     inlen: u64,
 ) -> c_int {
-    sha256_update_repr(&mut hmac_sha256_state(state).ictx, opt_slice(in_, len_to_usize(inlen)));
+    sha256_update_repr(
+        &mut hmac_sha256_state(state).ictx,
+        opt_slice(in_, len_to_usize(inlen)),
+    );
     0
 }
 
@@ -1016,7 +1070,10 @@ pub unsafe fn crypto_auth_hmacsha512_init(
     key: *const u8,
     keylen: usize,
 ) -> c_int {
-    ptr::write(state.cast::<HmacSha512StateRepr>(), hmac_sha512_init_repr(opt_slice(key, keylen)));
+    ptr::write(
+        state.cast::<HmacSha512StateRepr>(),
+        hmac_sha512_init_repr(opt_slice(key, keylen)),
+    );
     0
 }
 
@@ -1037,7 +1094,10 @@ pub unsafe fn crypto_auth_hmacsha512_update(
     in_: *const u8,
     inlen: u64,
 ) -> c_int {
-    sha512_update_repr(&mut hmac_sha512_state(state).ictx, opt_slice(in_, len_to_usize(inlen)));
+    sha512_update_repr(
+        &mut hmac_sha512_state(state).ictx,
+        opt_slice(in_, len_to_usize(inlen)),
+    );
     0
 }
 
@@ -1417,12 +1477,7 @@ pub unsafe fn crypto_generichash_update(
     crypto_generichash_blake2b_update(state.cast(), in_, inlen)
 }
 
-pub unsafe fn crypto_onetimeauth(
-    out: *mut u8,
-    in_: *const u8,
-    inlen: u64,
-    k: *const u8,
-) -> c_int {
+pub unsafe fn crypto_onetimeauth(out: *mut u8, in_: *const u8, inlen: u64, k: *const u8) -> c_int {
     crypto_onetimeauth_poly1305(out, in_, inlen, k)
 }
 
@@ -1500,7 +1555,11 @@ pub unsafe fn crypto_onetimeauth_poly1305_final(
 ) -> c_int {
     let tag = poly1305_finalize_repr(poly1305_state(state));
     opt_slice_mut(out, POLY1305_BYTES).copy_from_slice(&tag);
-    ptr::write_bytes(state.cast::<u8>(), 0, size_of::<crypto_onetimeauth_poly1305_state>());
+    ptr::write_bytes(
+        state.cast::<u8>(),
+        0,
+        size_of::<crypto_onetimeauth_poly1305_state>(),
+    );
     0
 }
 
@@ -1509,7 +1568,11 @@ pub unsafe fn crypto_onetimeauth_poly1305_init(
     key: *const u8,
 ) -> c_int {
     let key: [u8; POLY1305_KEYBYTES] = opt_slice(key, POLY1305_KEYBYTES).try_into().unwrap();
-    ptr::write_bytes(state.cast::<u8>(), 0, size_of::<crypto_onetimeauth_poly1305_state>());
+    ptr::write_bytes(
+        state.cast::<u8>(),
+        0,
+        size_of::<crypto_onetimeauth_poly1305_state>(),
+    );
     ptr::write(state.cast::<Poly1305StateRepr>(), poly1305_init_repr(&key));
     0
 }
@@ -1616,7 +1679,12 @@ pub unsafe fn crypto_core_hsalsa20_outputbytes() -> usize {
     32
 }
 
-pub unsafe fn crypto_core_salsa20(out: *mut u8, in_: *const u8, k: *const u8, c: *const u8) -> c_int {
+pub unsafe fn crypto_core_salsa20(
+    out: *mut u8,
+    in_: *const u8,
+    k: *const u8,
+    c: *const u8,
+) -> c_int {
     let input: [u8; 16] = opt_slice(in_, 16).try_into().unwrap();
     let key: [u8; 32] = opt_slice(k, 32).try_into().unwrap();
     let constants: [u8; 16] = if c.is_null() {
@@ -1681,7 +1749,12 @@ pub unsafe fn crypto_core_salsa2012_outputbytes() -> usize {
     64
 }
 
-pub unsafe fn crypto_core_salsa208(out: *mut u8, in_: *const u8, k: *const u8, c: *const u8) -> c_int {
+pub unsafe fn crypto_core_salsa208(
+    out: *mut u8,
+    in_: *const u8,
+    k: *const u8,
+    c: *const u8,
+) -> c_int {
     let input: [u8; 16] = opt_slice(in_, 16).try_into().unwrap();
     let key: [u8; 32] = opt_slice(k, 32).try_into().unwrap();
     let constants: [u8; 16] = if c.is_null() {
@@ -1711,7 +1784,11 @@ pub unsafe fn crypto_core_salsa208_outputbytes() -> usize {
     64
 }
 
-unsafe fn fill_stream<C: chacha20::cipher::StreamCipher>(out: *mut u8, len: u64, mut cipher: C) -> c_int {
+unsafe fn fill_stream<C: chacha20::cipher::StreamCipher>(
+    out: *mut u8,
+    len: u64,
+    mut cipher: C,
+) -> c_int {
     let out = opt_slice_mut(out, len_to_usize(len));
     out.fill(0);
     cipher.apply_keystream(out);
@@ -1906,12 +1983,7 @@ pub unsafe fn crypto_stream_salsa20_xor_ic(
     xor_stream(c, m, mlen, cipher)
 }
 
-pub unsafe fn crypto_stream_salsa2012(
-    c: *mut u8,
-    clen: u64,
-    n: *const u8,
-    k: *const u8,
-) -> c_int {
+pub unsafe fn crypto_stream_salsa2012(c: *mut u8, clen: u64, n: *const u8, k: *const u8) -> c_int {
     let cipher = Salsa12::new_from_slices(opt_slice(k, 32), opt_slice(n, 8)).unwrap();
     fill_stream(c, clen, cipher)
 }
@@ -1943,12 +2015,7 @@ pub unsafe fn crypto_stream_salsa2012_xor(
     xor_stream(c, m, mlen, cipher)
 }
 
-pub unsafe fn crypto_stream_salsa208(
-    c: *mut u8,
-    clen: u64,
-    n: *const u8,
-    k: *const u8,
-) -> c_int {
+pub unsafe fn crypto_stream_salsa208(c: *mut u8, clen: u64, n: *const u8, k: *const u8) -> c_int {
     let cipher = Salsa8::new_from_slices(opt_slice(k, 32), opt_slice(n, 8)).unwrap();
     fill_stream(c, clen, cipher)
 }
@@ -2112,16 +2179,33 @@ pub unsafe fn crypto_secretbox_detached(
     } else {
         Vec::new()
     };
-    let m = if msg.is_empty() { opt_slice(m, len) } else { msg.as_slice() };
+    let m = if msg.is_empty() {
+        opt_slice(m, len)
+    } else {
+        msg.as_slice()
+    };
     let mut block0 = [0u8; 64];
     let mlen0 = cmp::min(len, 64 - SECRETBOX_ZEROBYTES);
     block0[SECRETBOX_ZEROBYTES..SECRETBOX_ZEROBYTES + mlen0].copy_from_slice(&m[..mlen0]);
-    crypto_stream_salsa20_xor(block0.as_mut_ptr(), block0.as_ptr(), (mlen0 + SECRETBOX_ZEROBYTES) as u64, n.add(16), subkey.as_ptr());
+    crypto_stream_salsa20_xor(
+        block0.as_mut_ptr(),
+        block0.as_ptr(),
+        (mlen0 + SECRETBOX_ZEROBYTES) as u64,
+        n.add(16),
+        subkey.as_ptr(),
+    );
     let poly_key: [u8; POLY1305_KEYBYTES] = block0[..POLY1305_KEYBYTES].try_into().unwrap();
     opt_slice_mut(c, len)[..mlen0]
         .copy_from_slice(&block0[SECRETBOX_ZEROBYTES..SECRETBOX_ZEROBYTES + mlen0]);
     if len > mlen0 {
-        crypto_stream_salsa20_xor_ic(c.add(mlen0), m[mlen0..].as_ptr(), (len - mlen0) as u64, n.add(16), 1, subkey.as_ptr());
+        crypto_stream_salsa20_xor_ic(
+            c.add(mlen0),
+            m[mlen0..].as_ptr(),
+            (len - mlen0) as u64,
+            n.add(16),
+            1,
+            subkey.as_ptr(),
+        );
     }
     let mut mac_state = poly1305_init_repr(&poly_key);
     poly1305_update_repr(&mut mac_state, opt_slice(c, len));
@@ -2187,7 +2271,12 @@ pub unsafe fn crypto_secretbox_open_detached(
     );
     let len = len_to_usize(clen);
     let mut block0 = [0u8; 64];
-    crypto_stream_salsa20(block0.as_mut_ptr(), POLY1305_KEYBYTES as u64, n.add(16), subkey.as_ptr());
+    crypto_stream_salsa20(
+        block0.as_mut_ptr(),
+        POLY1305_KEYBYTES as u64,
+        n.add(16),
+        subkey.as_ptr(),
+    );
     if crypto_onetimeauth_poly1305_verify(mac, c, clen, block0.as_ptr()) != 0 {
         return -1;
     }
@@ -2199,14 +2288,31 @@ pub unsafe fn crypto_secretbox_open_detached(
     } else {
         Vec::new()
     };
-    let c = if cbuf.is_empty() { opt_slice(c, len) } else { cbuf.as_slice() };
+    let c = if cbuf.is_empty() {
+        opt_slice(c, len)
+    } else {
+        cbuf.as_slice()
+    };
     let mlen0 = cmp::min(len, 64 - SECRETBOX_ZEROBYTES);
     block0[SECRETBOX_ZEROBYTES..SECRETBOX_ZEROBYTES + mlen0].copy_from_slice(&c[..mlen0]);
-    crypto_stream_salsa20_xor(block0.as_mut_ptr(), block0.as_ptr(), (SECRETBOX_ZEROBYTES + mlen0) as u64, n.add(16), subkey.as_ptr());
+    crypto_stream_salsa20_xor(
+        block0.as_mut_ptr(),
+        block0.as_ptr(),
+        (SECRETBOX_ZEROBYTES + mlen0) as u64,
+        n.add(16),
+        subkey.as_ptr(),
+    );
     opt_slice_mut(m, len)[..mlen0]
         .copy_from_slice(&block0[SECRETBOX_ZEROBYTES..SECRETBOX_ZEROBYTES + mlen0]);
     if len > mlen0 {
-        crypto_stream_salsa20_xor_ic(m.add(mlen0), c[mlen0..].as_ptr(), (len - mlen0) as u64, n.add(16), 1, subkey.as_ptr());
+        crypto_stream_salsa20_xor_ic(
+            m.add(mlen0),
+            c[mlen0..].as_ptr(),
+            (len - mlen0) as u64,
+            n.add(16),
+            1,
+            subkey.as_ptr(),
+        );
     }
     0
 }
@@ -2221,7 +2327,14 @@ pub unsafe fn crypto_secretbox_open_easy(
     if clen < SECRETBOX_MACBYTES as u64 {
         return -1;
     }
-    crypto_secretbox_open_detached(m, c.add(SECRETBOX_MACBYTES), c, clen - SECRETBOX_MACBYTES as u64, n, k)
+    crypto_secretbox_open_detached(
+        m,
+        c.add(SECRETBOX_MACBYTES),
+        c,
+        clen - SECRETBOX_MACBYTES as u64,
+        n,
+        k,
+    )
 }
 
 pub unsafe fn crypto_secretbox_primitive() -> *const c_char {
@@ -2315,16 +2428,33 @@ pub unsafe fn crypto_secretbox_xchacha20poly1305_detached(
     } else {
         Vec::new()
     };
-    let m = if msg.is_empty() { opt_slice(m, len) } else { msg.as_slice() };
+    let m = if msg.is_empty() {
+        opt_slice(m, len)
+    } else {
+        msg.as_slice()
+    };
     let mut block0 = [0u8; 64];
     let mlen0 = cmp::min(len, 64 - SECRETBOX_ZEROBYTES);
     block0[SECRETBOX_ZEROBYTES..SECRETBOX_ZEROBYTES + mlen0].copy_from_slice(&m[..mlen0]);
-    crypto_stream_chacha20_xor(block0.as_mut_ptr(), block0.as_ptr(), (mlen0 + SECRETBOX_ZEROBYTES) as u64, n.add(16), subkey.as_ptr());
+    crypto_stream_chacha20_xor(
+        block0.as_mut_ptr(),
+        block0.as_ptr(),
+        (mlen0 + SECRETBOX_ZEROBYTES) as u64,
+        n.add(16),
+        subkey.as_ptr(),
+    );
     let poly_key: [u8; POLY1305_KEYBYTES] = block0[..POLY1305_KEYBYTES].try_into().unwrap();
     opt_slice_mut(c, len)[..mlen0]
         .copy_from_slice(&block0[SECRETBOX_ZEROBYTES..SECRETBOX_ZEROBYTES + mlen0]);
     if len > mlen0 {
-        crypto_stream_chacha20_xor_ic(c.add(mlen0), m[mlen0..].as_ptr(), (len - mlen0) as u64, n.add(16), 1, subkey.as_ptr());
+        crypto_stream_chacha20_xor_ic(
+            c.add(mlen0),
+            m[mlen0..].as_ptr(),
+            (len - mlen0) as u64,
+            n.add(16),
+            1,
+            subkey.as_ptr(),
+        );
     }
     let mut mac_state = poly1305_init_repr(&poly_key);
     poly1305_update_repr(&mut mac_state, opt_slice(c, len));
@@ -2376,7 +2506,12 @@ pub unsafe fn crypto_secretbox_xchacha20poly1305_open_detached(
     );
     let len = len_to_usize(clen);
     let mut block0 = [0u8; 64];
-    crypto_stream_chacha20(block0.as_mut_ptr(), POLY1305_KEYBYTES as u64, n.add(16), subkey.as_ptr());
+    crypto_stream_chacha20(
+        block0.as_mut_ptr(),
+        POLY1305_KEYBYTES as u64,
+        n.add(16),
+        subkey.as_ptr(),
+    );
     if crypto_onetimeauth_poly1305_verify(mac, c, clen, block0.as_ptr()) != 0 {
         return -1;
     }
@@ -2388,14 +2523,31 @@ pub unsafe fn crypto_secretbox_xchacha20poly1305_open_detached(
     } else {
         Vec::new()
     };
-    let c = if cbuf.is_empty() { opt_slice(c, len) } else { cbuf.as_slice() };
+    let c = if cbuf.is_empty() {
+        opt_slice(c, len)
+    } else {
+        cbuf.as_slice()
+    };
     let mlen0 = cmp::min(len, 64 - SECRETBOX_ZEROBYTES);
     block0[SECRETBOX_ZEROBYTES..SECRETBOX_ZEROBYTES + mlen0].copy_from_slice(&c[..mlen0]);
-    crypto_stream_chacha20_xor(block0.as_mut_ptr(), block0.as_ptr(), (SECRETBOX_ZEROBYTES + mlen0) as u64, n.add(16), subkey.as_ptr());
+    crypto_stream_chacha20_xor(
+        block0.as_mut_ptr(),
+        block0.as_ptr(),
+        (SECRETBOX_ZEROBYTES + mlen0) as u64,
+        n.add(16),
+        subkey.as_ptr(),
+    );
     opt_slice_mut(m, len)[..mlen0]
         .copy_from_slice(&block0[SECRETBOX_ZEROBYTES..SECRETBOX_ZEROBYTES + mlen0]);
     if len > mlen0 {
-        crypto_stream_chacha20_xor_ic(m.add(mlen0), c[mlen0..].as_ptr(), (len - mlen0) as u64, n.add(16), 1, subkey.as_ptr());
+        crypto_stream_chacha20_xor_ic(
+            m.add(mlen0),
+            c[mlen0..].as_ptr(),
+            (len - mlen0) as u64,
+            n.add(16),
+            1,
+            subkey.as_ptr(),
+        );
     }
     0
 }
@@ -2410,15 +2562,17 @@ pub unsafe fn crypto_secretbox_xchacha20poly1305_open_easy(
     if clen < SECRETBOX_MACBYTES as u64 {
         return -1;
     }
-    crypto_secretbox_xchacha20poly1305_open_detached(m, c.add(SECRETBOX_MACBYTES), c, clen - SECRETBOX_MACBYTES as u64, n, k)
+    crypto_secretbox_xchacha20poly1305_open_detached(
+        m,
+        c.add(SECRETBOX_MACBYTES),
+        c,
+        clen - SECRETBOX_MACBYTES as u64,
+        n,
+        k,
+    )
 }
 
-pub unsafe fn crypto_shorthash(
-    out: *mut u8,
-    in_: *const u8,
-    inlen: u64,
-    k: *const u8,
-) -> c_int {
+pub unsafe fn crypto_shorthash(out: *mut u8, in_: *const u8, inlen: u64, k: *const u8) -> c_int {
     crypto_shorthash_siphash24(out, in_, inlen, k)
 }
 
@@ -2559,7 +2713,10 @@ pub unsafe fn crypto_secretstream_xchacha20poly1305_keygen(k: *mut u8) {
 }
 
 pub unsafe fn crypto_secretstream_xchacha20poly1305_messagebytes_max() -> usize {
-    cmp::min(usize::MAX - SECRETSTREAM_ABYTES, (((1u64 << 32) - 2) as usize) * 64)
+    cmp::min(
+        usize::MAX - SECRETSTREAM_ABYTES,
+        (((1u64 << 32) - 2) as usize) * 64,
+    )
 }
 
 pub unsafe fn crypto_secretstream_xchacha20poly1305_push(
@@ -2861,7 +3018,14 @@ pub unsafe fn crypto_aead_chacha20poly1305_decrypt(
         k,
         false,
     );
-    write_opt(mlen_p, if ret == 0 { clen - AEAD_ABYTES as u64 } else { 0 });
+    write_opt(
+        mlen_p,
+        if ret == 0 {
+            clen - AEAD_ABYTES as u64
+        } else {
+            0
+        },
+    );
     ret
 }
 
@@ -2920,7 +3084,9 @@ pub unsafe fn crypto_aead_chacha20poly1305_encrypt_detached(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
-    aead_chacha20poly1305_encrypt_detached_inner(c, mac, maclen_p, m, mlen, ad, adlen, npub, k, false)
+    aead_chacha20poly1305_encrypt_detached_inner(
+        c, mac, maclen_p, m, mlen, ad, adlen, npub, k, false,
+    )
 }
 
 pub unsafe fn crypto_aead_chacha20poly1305_ietf_abytes() -> usize {
@@ -2953,7 +3119,14 @@ pub unsafe fn crypto_aead_chacha20poly1305_ietf_decrypt(
         k,
         true,
     );
-    write_opt(mlen_p, if ret == 0 { clen - AEAD_ABYTES as u64 } else { 0 });
+    write_opt(
+        mlen_p,
+        if ret == 0 {
+            clen - AEAD_ABYTES as u64
+        } else {
+            0
+        },
+    );
     ret
 }
 
@@ -3012,7 +3185,9 @@ pub unsafe fn crypto_aead_chacha20poly1305_ietf_encrypt_detached(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
-    aead_chacha20poly1305_encrypt_detached_inner(c, mac, maclen_p, m, mlen, ad, adlen, npub, k, true)
+    aead_chacha20poly1305_encrypt_detached_inner(
+        c, mac, maclen_p, m, mlen, ad, adlen, npub, k, true,
+    )
 }
 
 pub unsafe fn crypto_aead_chacha20poly1305_ietf_keybytes() -> usize {
@@ -3024,7 +3199,10 @@ pub unsafe fn crypto_aead_chacha20poly1305_ietf_keygen(k: *mut u8) {
 }
 
 pub unsafe fn crypto_aead_chacha20poly1305_ietf_messagebytes_max() -> usize {
-    cmp::min(usize::MAX - AEAD_ABYTES, (((1u128 << 32) - 1) * 64) as usize)
+    cmp::min(
+        usize::MAX - AEAD_ABYTES,
+        (((1u128 << 32) - 1) * 64) as usize,
+    )
 }
 
 pub unsafe fn crypto_aead_chacha20poly1305_ietf_npubbytes() -> usize {
@@ -3074,7 +3252,11 @@ pub unsafe fn crypto_aead_xchacha20poly1305_ietf_decrypt(
         write_opt(mlen_p, 0);
         return -1;
     }
-    let subkey = hchacha20_core(&opt_slice(npub, 16).try_into().unwrap(), &opt_slice(k, 32).try_into().unwrap(), &CHACHA_SIGMA);
+    let subkey = hchacha20_core(
+        &opt_slice(npub, 16).try_into().unwrap(),
+        &opt_slice(k, 32).try_into().unwrap(),
+        &CHACHA_SIGMA,
+    );
     let mut nonce = [0u8; 12];
     nonce[4..].copy_from_slice(opt_slice(npub.add(16), 8));
     let ret = aead_chacha20poly1305_decrypt_detached_inner(
@@ -3088,7 +3270,14 @@ pub unsafe fn crypto_aead_xchacha20poly1305_ietf_decrypt(
         subkey.as_ptr(),
         true,
     );
-    write_opt(mlen_p, if ret == 0 { clen - AEAD_ABYTES as u64 } else { 0 });
+    write_opt(
+        mlen_p,
+        if ret == 0 {
+            clen - AEAD_ABYTES as u64
+        } else {
+            0
+        },
+    );
     ret
 }
 
@@ -3103,10 +3292,24 @@ pub unsafe fn crypto_aead_xchacha20poly1305_ietf_decrypt_detached(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
-    let subkey = hchacha20_core(&opt_slice(npub, 16).try_into().unwrap(), &opt_slice(k, 32).try_into().unwrap(), &CHACHA_SIGMA);
+    let subkey = hchacha20_core(
+        &opt_slice(npub, 16).try_into().unwrap(),
+        &opt_slice(k, 32).try_into().unwrap(),
+        &CHACHA_SIGMA,
+    );
     let mut nonce = [0u8; 12];
     nonce[4..].copy_from_slice(opt_slice(npub.add(16), 8));
-    aead_chacha20poly1305_decrypt_detached_inner(m, c, clen, mac, ad, adlen, nonce.as_ptr(), subkey.as_ptr(), true)
+    aead_chacha20poly1305_decrypt_detached_inner(
+        m,
+        c,
+        clen,
+        mac,
+        ad,
+        adlen,
+        nonce.as_ptr(),
+        subkey.as_ptr(),
+        true,
+    )
 }
 
 pub unsafe fn crypto_aead_xchacha20poly1305_ietf_encrypt(
@@ -3120,7 +3323,11 @@ pub unsafe fn crypto_aead_xchacha20poly1305_ietf_encrypt(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
-    let subkey = hchacha20_core(&opt_slice(npub, 16).try_into().unwrap(), &opt_slice(k, 32).try_into().unwrap(), &CHACHA_SIGMA);
+    let subkey = hchacha20_core(
+        &opt_slice(npub, 16).try_into().unwrap(),
+        &opt_slice(k, 32).try_into().unwrap(),
+        &CHACHA_SIGMA,
+    );
     let mut nonce = [0u8; 12];
     nonce[4..].copy_from_slice(opt_slice(npub.add(16), 8));
     let ret = aead_chacha20poly1305_encrypt_detached_inner(
@@ -3153,10 +3360,25 @@ pub unsafe fn crypto_aead_xchacha20poly1305_ietf_encrypt_detached(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
-    let subkey = hchacha20_core(&opt_slice(npub, 16).try_into().unwrap(), &opt_slice(k, 32).try_into().unwrap(), &CHACHA_SIGMA);
+    let subkey = hchacha20_core(
+        &opt_slice(npub, 16).try_into().unwrap(),
+        &opt_slice(k, 32).try_into().unwrap(),
+        &CHACHA_SIGMA,
+    );
     let mut nonce = [0u8; 12];
     nonce[4..].copy_from_slice(opt_slice(npub.add(16), 8));
-    aead_chacha20poly1305_encrypt_detached_inner(c, mac, maclen_p, m, mlen, ad, adlen, nonce.as_ptr(), subkey.as_ptr(), true)
+    aead_chacha20poly1305_encrypt_detached_inner(
+        c,
+        mac,
+        maclen_p,
+        m,
+        mlen,
+        ad,
+        adlen,
+        nonce.as_ptr(),
+        subkey.as_ptr(),
+        true,
+    )
 }
 
 pub unsafe fn crypto_aead_xchacha20poly1305_ietf_keybytes() -> usize {
@@ -3183,18 +3405,33 @@ pub unsafe fn crypto_aead_aes256gcm_abytes() -> usize {
     AEAD_ABYTES
 }
 
+unsafe fn aes256gcm_require_available() -> c_int {
+    if crypto_aead_aes256gcm_is_available() == 0 {
+        set_errno(libc::ENOSYS);
+        return -1;
+    }
+    0
+}
+
 pub unsafe fn crypto_aead_aes256gcm_beforenm(
     ctx_: *mut crypto_aead_aes256gcm_state,
     k: *const u8,
 ) -> c_int {
+    if aes256gcm_require_available() != 0 {
+        return -1;
+    }
     let ctx = opt_slice_mut(ctx_.cast::<u8>(), size_of::<crypto_aead_aes256gcm_state>());
     ctx.fill(0);
     ctx[..AES256GCM_KEYBYTES].copy_from_slice(opt_slice(k, AES256GCM_KEYBYTES));
     0
 }
 
-unsafe fn aes256gcm_key_from_state(ctx_: *const crypto_aead_aes256gcm_state) -> [u8; AES256GCM_KEYBYTES] {
-    opt_slice(ctx_.cast::<u8>(), AES256GCM_KEYBYTES).try_into().unwrap()
+unsafe fn aes256gcm_key_from_state(
+    ctx_: *const crypto_aead_aes256gcm_state,
+) -> [u8; AES256GCM_KEYBYTES] {
+    opt_slice(ctx_.cast::<u8>(), AES256GCM_KEYBYTES)
+        .try_into()
+        .unwrap()
 }
 
 pub unsafe fn crypto_aead_aes256gcm_decrypt(
@@ -3208,6 +3445,9 @@ pub unsafe fn crypto_aead_aes256gcm_decrypt(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
+    if aes256gcm_require_available() != 0 {
+        return -1;
+    }
     if clen < 16 {
         write_opt(mlen_p, 0);
         return -1;
@@ -3238,7 +3478,20 @@ pub unsafe fn crypto_aead_aes256gcm_decrypt_afternm(
     npub: *const u8,
     ctx_: *const crypto_aead_aes256gcm_state,
 ) -> c_int {
-    crypto_aead_aes256gcm_decrypt(m, mlen_p, ptr::null_mut(), c, clen, ad, adlen, npub, aes256gcm_key_from_state(ctx_).as_ptr())
+    if aes256gcm_require_available() != 0 {
+        return -1;
+    }
+    crypto_aead_aes256gcm_decrypt(
+        m,
+        mlen_p,
+        ptr::null_mut(),
+        c,
+        clen,
+        ad,
+        adlen,
+        npub,
+        aes256gcm_key_from_state(ctx_).as_ptr(),
+    )
 }
 
 pub unsafe fn crypto_aead_aes256gcm_decrypt_detached(
@@ -3252,13 +3505,22 @@ pub unsafe fn crypto_aead_aes256gcm_decrypt_detached(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
+    if aes256gcm_require_available() != 0 {
+        return -1;
+    }
+    if clen > AES256GCM_MESSAGEBYTES_MAX as u64 {
+        crate::foundation::core::sodium_misuse();
+    }
     use aes_gcm::aead::{AeadInPlace, KeyInit};
     let key = aes_gcm::Key::<aes_gcm::Aes256Gcm>::from_slice(opt_slice(k, AES256GCM_KEYBYTES));
     let cipher = aes_gcm::Aes256Gcm::new(key);
     let nonce = aes_gcm::Nonce::from_slice(opt_slice(npub, AES256GCM_NONCEBYTES));
     let tag = aes_gcm::Tag::from_slice(opt_slice(mac, 16));
     let out = copy_or_in_place(m, c, len_to_usize(clen));
-    cipher.decrypt_in_place_detached(nonce, opt_slice(ad, len_to_usize(adlen)), out, tag).map(|_| 0).unwrap_or(-1)
+    cipher
+        .decrypt_in_place_detached(nonce, opt_slice(ad, len_to_usize(adlen)), out, tag)
+        .map(|_| 0)
+        .unwrap_or(-1)
 }
 
 pub unsafe fn crypto_aead_aes256gcm_decrypt_detached_afternm(
@@ -3272,7 +3534,20 @@ pub unsafe fn crypto_aead_aes256gcm_decrypt_detached_afternm(
     npub: *const u8,
     ctx_: *const crypto_aead_aes256gcm_state,
 ) -> c_int {
-    crypto_aead_aes256gcm_decrypt_detached(m, nsec, c, clen, mac, ad, adlen, npub, aes256gcm_key_from_state(ctx_).as_ptr())
+    if aes256gcm_require_available() != 0 {
+        return -1;
+    }
+    crypto_aead_aes256gcm_decrypt_detached(
+        m,
+        nsec,
+        c,
+        clen,
+        mac,
+        ad,
+        adlen,
+        npub,
+        aes256gcm_key_from_state(ctx_).as_ptr(),
+    )
 }
 
 pub unsafe fn crypto_aead_aes256gcm_encrypt(
@@ -3286,7 +3561,21 @@ pub unsafe fn crypto_aead_aes256gcm_encrypt(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
-    let ret = crypto_aead_aes256gcm_encrypt_detached(c, c.add(len_to_usize(mlen)), ptr::null_mut(), m, mlen, ad, adlen, ptr::null(), npub, k);
+    if aes256gcm_require_available() != 0 {
+        return -1;
+    }
+    let ret = crypto_aead_aes256gcm_encrypt_detached(
+        c,
+        c.add(len_to_usize(mlen)),
+        ptr::null_mut(),
+        m,
+        mlen,
+        ad,
+        adlen,
+        ptr::null(),
+        npub,
+        k,
+    );
     if ret == 0 {
         write_opt(clen_p, mlen + 16);
     }
@@ -3304,7 +3593,20 @@ pub unsafe fn crypto_aead_aes256gcm_encrypt_afternm(
     npub: *const u8,
     ctx_: *const crypto_aead_aes256gcm_state,
 ) -> c_int {
-    crypto_aead_aes256gcm_encrypt(c, clen_p, m, mlen, ad, adlen, ptr::null(), npub, aes256gcm_key_from_state(ctx_).as_ptr())
+    if aes256gcm_require_available() != 0 {
+        return -1;
+    }
+    crypto_aead_aes256gcm_encrypt(
+        c,
+        clen_p,
+        m,
+        mlen,
+        ad,
+        adlen,
+        ptr::null(),
+        npub,
+        aes256gcm_key_from_state(ctx_).as_ptr(),
+    )
 }
 
 pub unsafe fn crypto_aead_aes256gcm_encrypt_detached(
@@ -3319,6 +3621,12 @@ pub unsafe fn crypto_aead_aes256gcm_encrypt_detached(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
+    if aes256gcm_require_available() != 0 {
+        return -1;
+    }
+    if mlen > AES256GCM_MESSAGEBYTES_MAX as u64 {
+        crate::foundation::core::sodium_misuse();
+    }
     use aes_gcm::aead::{AeadInPlace, KeyInit};
     let key = aes_gcm::Key::<aes_gcm::Aes256Gcm>::from_slice(opt_slice(k, AES256GCM_KEYBYTES));
     let cipher = aes_gcm::Aes256Gcm::new(key);
@@ -3346,11 +3654,25 @@ pub unsafe fn crypto_aead_aes256gcm_encrypt_detached_afternm(
     npub: *const u8,
     ctx_: *const crypto_aead_aes256gcm_state,
 ) -> c_int {
-    crypto_aead_aes256gcm_encrypt_detached(c, mac, maclen_p, m, mlen, ad, adlen, nsec, npub, aes256gcm_key_from_state(ctx_).as_ptr())
+    if aes256gcm_require_available() != 0 {
+        return -1;
+    }
+    crypto_aead_aes256gcm_encrypt_detached(
+        c,
+        mac,
+        maclen_p,
+        m,
+        mlen,
+        ad,
+        adlen,
+        nsec,
+        npub,
+        aes256gcm_key_from_state(ctx_).as_ptr(),
+    )
 }
 
 pub unsafe fn crypto_aead_aes256gcm_is_available() -> c_int {
-    1
+    sodium_runtime_has_pclmul() & sodium_runtime_has_aesni()
 }
 
 pub unsafe fn crypto_aead_aes256gcm_keybytes() -> usize {
@@ -3362,7 +3684,7 @@ pub unsafe fn crypto_aead_aes256gcm_keygen(k: *mut u8) {
 }
 
 pub unsafe fn crypto_aead_aes256gcm_messagebytes_max() -> usize {
-    usize::MAX - AEAD_ABYTES
+    AES256GCM_MESSAGEBYTES_MAX
 }
 
 pub unsafe fn crypto_aead_aes256gcm_npubbytes() -> usize {
@@ -3397,6 +3719,7 @@ pub unsafe fn crypto_kdf_blake2b_derive_from_key(
     key: *const u8,
 ) -> c_int {
     if !(KDF_BYTES_MIN..=KDF_BYTES_MAX).contains(&subkey_len) {
+        set_errno(libc::EINVAL);
         return -1;
     }
     let mut salt = [0u8; 16];
@@ -3404,7 +3727,11 @@ pub unsafe fn crypto_kdf_blake2b_derive_from_key(
     let mut personal = [0u8; 16];
     personal[..8].copy_from_slice(opt_slice(ctx.cast::<u8>(), 8));
     let mut params = Blake2bParams::new();
-    params.hash_length(subkey_len).key(opt_slice(key, KDF_KEYBYTES)).salt(&salt).personal(&personal);
+    params
+        .hash_length(subkey_len)
+        .key(opt_slice(key, KDF_KEYBYTES))
+        .salt(&salt)
+        .personal(&personal);
     let hash = params.hash(&[]);
     opt_slice_mut(subkey, subkey_len).copy_from_slice(&hash.as_bytes()[..subkey_len]);
     0
@@ -3448,10 +3775,11 @@ pub unsafe fn crypto_kdf_primitive() -> *const c_char {
     static_cstr(b"blake2b\0")
 }
 
-fn pwhash_opslimit_min(alg: c_int) -> u64 {
+fn pwhash_opslimit_min(alg: c_int) -> Option<u64> {
     match alg {
-        PWHASH_ALG_ARGON2I13 => PWHASH_ARGON2I_OPSLIMIT_MIN,
-        _ => PWHASH_ARGON2ID_OPSLIMIT_MIN,
+        PWHASH_ALG_ARGON2I13 => Some(PWHASH_ARGON2I_OPSLIMIT_MIN),
+        PWHASH_ALG_ARGON2ID13 => Some(PWHASH_ARGON2ID_OPSLIMIT_MIN),
+        _ => None,
     }
 }
 
@@ -3463,77 +3791,424 @@ fn pwhash_algorithm(alg: c_int) -> Option<Argon2Algorithm> {
     }
 }
 
-fn pwhash_hash_raw(out: &mut [u8], passwd: &[u8], salt: &[u8], opslimit: u64, memlimit: usize, alg: c_int) -> c_int {
-    if out.len() < PWHASH_BYTES_MIN || out.len() > PWHASH_BYTES_MAX {
-        return -1;
-    }
-    if passwd.len() > PWHASH_PASSWD_MAX || salt.len() != PWHASH_SALTBYTES {
-        return -1;
-    }
-    if memlimit < PWHASH_MEMLIMIT_MIN || memlimit > PWHASH_MEMLIMIT_MAX || opslimit < pwhash_opslimit_min(alg) || opslimit > PWHASH_OPSLIMIT_MAX {
-        return -1;
-    }
-    let Some(algorithm) = pwhash_algorithm(alg) else { return -1 };
-    let params = match Argon2Params::new((memlimit / 1024) as u32, opslimit as u32, 1, Some(out.len())) {
-        Ok(params) => params,
-        Err(_) => return -1,
-    };
-    let argon2 = Argon2::new(algorithm, Argon2Version::V0x13, params);
-    argon2.hash_password_into(passwd, salt, out).map(|_| 0).unwrap_or(-1)
+fn argon2_params(out_len: usize, opslimit: u64, memlimit: usize) -> Option<Argon2Params> {
+    let mem_cost = u32::try_from(memlimit / 1024).ok()?;
+    let time_cost = u32::try_from(opslimit).ok()?;
+    Argon2Params::new(mem_cost, time_cost, 1, Some(out_len)).ok()
 }
 
-fn pwhash_string_prefix(alg: c_int) -> &'static str {
-    match alg {
-        PWHASH_ALG_ARGON2I13 => "$argon2i$",
-        _ => "$argon2id$",
+unsafe fn pwhash_argon2_raw_inner(
+    out: *mut u8,
+    outlen: u64,
+    passwd: *const c_char,
+    passwdlen: u64,
+    salt: *const u8,
+    opslimit: u64,
+    memlimit: usize,
+    alg: c_int,
+    required_alg: Option<c_int>,
+) -> c_int {
+    if outlen <= usize::MAX as u64 {
+        zero_output(out, outlen as usize);
     }
-}
-
-fn pwhash_make_string(passwd: &[u8], opslimit: u64, memlimit: usize, alg: c_int) -> Option<String> {
-    let mut salt = [0u8; PWHASH_SALTBYTES];
-    let mut hash = [0u8; 32];
-    unsafe { fill_random_bytes(salt.as_mut_ptr(), salt.len()) };
-    if pwhash_hash_raw(&mut hash, passwd, &salt, opslimit, memlimit, alg) != 0 {
-        return None;
-    }
-    Some(format!(
-        "{}v=19$m={},t={},p=1${}${}",
-        pwhash_string_prefix(alg),
-        memlimit / 1024,
-        opslimit,
-        base64::engine::general_purpose::STANDARD_NO_PAD.encode(salt),
-        base64::engine::general_purpose::STANDARD_NO_PAD.encode(hash)
-    ))
-}
-
-fn pwhash_parse_string(s: &str) -> Option<(c_int, u64, usize, Vec<u8>, Vec<u8>)> {
-    let parts: Vec<_> = s.split('$').collect();
-    if parts.len() != 6 || !parts[0].is_empty() || parts[2] != "v=19" {
-        return None;
-    }
-    let alg = match parts[1] {
-        "argon2i" => PWHASH_ALG_ARGON2I13,
-        "argon2id" => PWHASH_ALG_ARGON2ID13,
-        _ => return None,
-    };
-    let mut m_cost = None;
-    let mut t_cost = None;
-    let mut p = None;
-    for kv in parts[3].split(',') {
-        if let Some(value) = kv.strip_prefix("m=") {
-            m_cost = value.parse::<usize>().ok();
-        } else if let Some(value) = kv.strip_prefix("t=") {
-            t_cost = value.parse::<u64>().ok();
-        } else if let Some(value) = kv.strip_prefix("p=") {
-            p = value.parse::<u32>().ok();
+    if let Some(expected_alg) = required_alg {
+        if alg != expected_alg {
+            set_errno(libc::EINVAL);
+            return -1;
         }
     }
-    if p != Some(1) {
+    if outlen > PWHASH_BYTES_MAX as u64
+        || passwdlen > PWHASH_PASSWD_MAX as u64
+        || opslimit > PWHASH_OPSLIMIT_MAX
+        || memlimit > PWHASH_MEMLIMIT_MAX
+    {
+        set_errno(libc::EFBIG);
+        return -1;
+    }
+    let Some(opslimit_min) = pwhash_opslimit_min(alg) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    if outlen < PWHASH_BYTES_MIN as u64 || opslimit < opslimit_min || memlimit < PWHASH_MEMLIMIT_MIN
+    {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    let outlen = outlen as usize;
+    let passwdlen = passwdlen as usize;
+    let Some(algorithm) = pwhash_algorithm(alg) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    let Some(params) = argon2_params(outlen, opslimit, memlimit) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    let argon2 = Argon2::new(algorithm, Argon2Version::V0x13, params);
+    argon2
+        .hash_password_into(
+            opt_slice(passwd.cast::<u8>(), passwdlen),
+            opt_slice(salt, PWHASH_SALTBYTES),
+            opt_slice_mut(out, outlen),
+        )
+        .map(|_| 0)
+        .unwrap_or(-1)
+}
+
+unsafe fn pwhash_argon2_str_inner(
+    out: *mut c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+    opslimit: u64,
+    memlimit: usize,
+    alg: c_int,
+) -> c_int {
+    zero_char_output(out, PWHASH_STRBYTES);
+    if passwdlen > PWHASH_PASSWD_MAX as u64
+        || opslimit > PWHASH_OPSLIMIT_MAX
+        || memlimit > PWHASH_MEMLIMIT_MAX
+    {
+        set_errno(libc::EFBIG);
+        return -1;
+    }
+    let Some(opslimit_min) = pwhash_opslimit_min(alg) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    if opslimit < opslimit_min || memlimit < PWHASH_MEMLIMIT_MIN {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    let passwd = opt_slice(passwd.cast::<u8>(), passwdlen as usize);
+    let Some(algorithm) = pwhash_algorithm(alg) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    let Some(params) = argon2_params(32, opslimit, memlimit) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    let mut salt = [0u8; PWHASH_SALTBYTES];
+    fill_random_bytes(salt.as_mut_ptr(), salt.len());
+    let argon2 = Argon2::new(algorithm, Argon2Version::V0x13, params);
+    match argon2.hash_password_with_salt(passwd, &salt) {
+        Ok(hash) => write_c_string(out, PWHASH_STRBYTES, &hash.to_string()),
+        Err(_) => -1,
+    }
+}
+
+fn argon2_matches_alg(hash: &PhcPasswordHash, alg: c_int) -> bool {
+    match alg {
+        PWHASH_ALG_ARGON2I13 => hash.algorithm.as_str() == "argon2i",
+        PWHASH_ALG_ARGON2ID13 => hash.algorithm.as_str() == "argon2id",
+        _ => false,
+    }
+}
+
+unsafe fn pwhash_argon2_needs_rehash_inner(
+    str_: *const c_char,
+    opslimit: u64,
+    memlimit: usize,
+    alg: c_int,
+) -> c_int {
+    let Some(encoded) = read_c_string(str_) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    let memlimit_kib = memlimit / 1024;
+    if opslimit > u32::MAX as u64
+        || memlimit_kib > u32::MAX as usize
+        || encoded.len() >= PWHASH_STRBYTES
+    {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    let Ok(hash) = PhcPasswordHash::new(&encoded) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    if !argon2_matches_alg(&hash, alg) {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    let Some(actual_ops): Option<u32> = hash.params.get("t").and_then(|value| value.decimal().ok())
+    else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    let Some(actual_mem): Option<u32> = hash.params.get("m").and_then(|value| value.decimal().ok())
+    else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    if u64::from(actual_ops) != opslimit || usize::try_from(actual_mem).ok() != Some(memlimit_kib) {
+        return 1;
+    }
+    0
+}
+
+unsafe fn pwhash_argon2_verify_inner(
+    str_: *const c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+    alg: c_int,
+) -> c_int {
+    if passwdlen > PWHASH_PASSWD_MAX as u64 {
+        set_errno(libc::EFBIG);
+        return -1;
+    }
+    let Some(encoded) = read_c_string(str_) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    let Ok(hash) = PhcPasswordHash::new(&encoded) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    if !argon2_matches_alg(&hash, alg) {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    let passwd = opt_slice(passwd.cast::<u8>(), passwdlen as usize);
+    match Argon2::default().verify_password(passwd, &hash) {
+        Ok(()) => 0,
+        Err(_) => {
+            set_errno(libc::EINVAL);
+            -1
+        }
+    }
+}
+
+fn scrypt_pickparams(opslimit: u64, memlimit: usize) -> (u8, u32, u32) {
+    let opslimit = opslimit.max(PWHASH_SCRYPT_OPSLIMIT_MIN);
+    let r = 8u32;
+    if opslimit < (memlimit / 32) as u64 {
+        let max_n = opslimit / (u64::from(r) * 4);
+        let mut log_n = 1u8;
+        while log_n < 63 {
+            if (1u64 << log_n) > max_n / 2 {
+                break;
+            }
+            log_n += 1;
+        }
+        (log_n, r, 1)
+    } else {
+        let max_n = (memlimit / (r as usize * 128)) as u64;
+        let mut log_n = 1u8;
+        while log_n < 63 {
+            if (1u64 << log_n) > max_n / 2 {
+                break;
+            }
+            log_n += 1;
+        }
+        let mut max_rp = (opslimit / 4) / (1u64 << log_n);
+        if max_rp > 0x3fff_ffff {
+            max_rp = 0x3fff_ffff;
+        }
+        (log_n, r, (max_rp as u32) / r)
+    }
+}
+
+fn scrypt_decode_one(byte: u8) -> Option<u32> {
+    SCRYPT_ITOA64
+        .iter()
+        .position(|&candidate| candidate == byte)
+        .map(|value| value as u32)
+}
+
+fn scrypt_decode64_uint32(src: &[u8]) -> Option<u32> {
+    let mut value = 0u32;
+    for (index, byte) in src.iter().copied().take(5).enumerate() {
+        value |= scrypt_decode_one(byte)? << (6 * index);
+    }
+    Some(value)
+}
+
+fn scrypt_push_u32_encoded(dst: &mut String, mut value: u32, bits: u32) {
+    let mut bit = 0u32;
+    while bit < bits {
+        dst.push(SCRYPT_ITOA64[(value & 0x3f) as usize] as char);
+        value >>= 6;
+        bit += 6;
+    }
+}
+
+fn scrypt_push_bytes_encoded(dst: &mut String, src: &[u8]) {
+    let mut index = 0usize;
+    while index < src.len() {
+        let mut value = 0u32;
+        let mut bits = 0u32;
+        while bits < 24 && index < src.len() {
+            value |= u32::from(src[index]) << bits;
+            bits += 8;
+            index += 1;
+        }
+        scrypt_push_u32_encoded(dst, value, bits);
+    }
+}
+
+fn scrypt_format_setting(log_n: u8, r: u32, p: u32, salt: &[u8]) -> Option<String> {
+    if log_n > 63 || u64::from(r) * u64::from(p) >= (1u64 << 30) {
         return None;
     }
-    let salt = base64::engine::general_purpose::STANDARD_NO_PAD.decode(parts[4]).ok()?;
-    let hash = base64::engine::general_purpose::STANDARD_NO_PAD.decode(parts[5]).ok()?;
-    Some((alg, t_cost?, m_cost?.saturating_mul(1024), salt, hash))
+    let mut setting = String::with_capacity(PWHASH_SCRYPT_STRSETTINGBYTES);
+    setting.push_str("$7$");
+    setting.push(SCRYPT_ITOA64[log_n as usize] as char);
+    scrypt_push_u32_encoded(&mut setting, r, 30);
+    scrypt_push_u32_encoded(&mut setting, p, 30);
+    scrypt_push_bytes_encoded(&mut setting, salt);
+    if setting.len() == PWHASH_SCRYPT_STRSETTINGBYTES {
+        Some(setting)
+    } else {
+        None
+    }
+}
+
+fn scrypt_parse_setting(setting: &[u8]) -> Option<(u8, u32, u32)> {
+    if setting.len() < 14 || &setting[..3] != b"$7$" {
+        return None;
+    }
+    let log_n = scrypt_decode_one(setting[3])? as u8;
+    let r = scrypt_decode64_uint32(&setting[4..9])?;
+    let p = scrypt_decode64_uint32(&setting[9..14])?;
+    Some((log_n, r, p))
+}
+
+fn scrypt_hash_inner(
+    passwd: &[u8],
+    salt: &[u8],
+    log_n: u8,
+    r: u32,
+    p: u32,
+    out: &mut [u8],
+) -> c_int {
+    let Ok(params) = ScryptParams::new(log_n, r, p) else {
+        unsafe {
+            set_errno(libc::EINVAL);
+        }
+        return -1;
+    };
+    scrypt::scrypt(passwd, salt, &params, out)
+        .map(|_| 0)
+        .unwrap_or_else(|_| {
+            unsafe {
+                set_errno(libc::EINVAL);
+            }
+            -1
+        })
+}
+
+unsafe fn pwhash_scrypt_inner(
+    out: *mut u8,
+    outlen: u64,
+    passwd: *const c_char,
+    passwdlen: u64,
+    salt: *const u8,
+    opslimit: u64,
+    memlimit: usize,
+) -> c_int {
+    if outlen <= usize::MAX as u64 {
+        zero_output(out, outlen as usize);
+    }
+    if passwdlen > usize::MAX as u64 || outlen > PWHASH_SCRYPT_BYTES_MAX as u64 {
+        set_errno(libc::EFBIG);
+        return -1;
+    }
+    if outlen < PWHASH_SCRYPT_BYTES_MIN as u64 {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    let (log_n, r, p) = scrypt_pickparams(opslimit, memlimit);
+    scrypt_hash_inner(
+        opt_slice(passwd.cast::<u8>(), passwdlen as usize),
+        opt_slice(salt, PWHASH_SCRYPT_SALTBYTES),
+        log_n,
+        r,
+        p,
+        opt_slice_mut(out, outlen as usize),
+    )
+}
+
+unsafe fn pwhash_scrypt_str_inner(
+    out: *mut c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+    opslimit: u64,
+    memlimit: usize,
+) -> c_int {
+    zero_char_output(out, PWHASH_SCRYPT_STRBYTES);
+    if passwdlen > usize::MAX as u64 {
+        set_errno(libc::EFBIG);
+        return -1;
+    }
+    let (log_n, r, p) = scrypt_pickparams(opslimit, memlimit);
+    let mut raw_salt = [0u8; PWHASH_SCRYPT_STRSALTBYTES];
+    fill_random_bytes(raw_salt.as_mut_ptr(), raw_salt.len());
+    let Some(setting) = scrypt_format_setting(log_n, r, p, &raw_salt) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    let mut hash = [0u8; PWHASH_SCRYPT_STRHASHBYTES];
+    if scrypt_hash_inner(
+        opt_slice(passwd.cast::<u8>(), passwdlen as usize),
+        &setting.as_bytes()[14..],
+        log_n,
+        r,
+        p,
+        &mut hash,
+    ) != 0
+    {
+        return -1;
+    }
+    let mut encoded_hash = String::with_capacity(43);
+    scrypt_push_bytes_encoded(&mut encoded_hash, &hash);
+    let value = format!("{setting}${encoded_hash}");
+    write_c_string(out, PWHASH_SCRYPT_STRBYTES, &value)
+}
+
+unsafe fn pwhash_scrypt_verify_inner(
+    str_: *const c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+) -> c_int {
+    if c_strnlen(str_, PWHASH_SCRYPT_STRBYTES) != PWHASH_SCRYPT_STRBYTES - 1 {
+        return -1;
+    }
+    let Some(encoded) = read_c_string(str_) else {
+        return -1;
+    };
+    let bytes = encoded.as_bytes();
+    let Some(last_dollar) = bytes.iter().rposition(|&byte| byte == b'$') else {
+        return -1;
+    };
+    if last_dollar + 1 + 43 != PWHASH_SCRYPT_STRBYTES - 1 {
+        return -1;
+    }
+    let Some((log_n, r, p)) = scrypt_parse_setting(&bytes[..14]) else {
+        return -1;
+    };
+    let mut hash = [0u8; PWHASH_SCRYPT_STRHASHBYTES];
+    if scrypt_hash_inner(
+        opt_slice(passwd.cast::<u8>(), passwdlen as usize),
+        &bytes[14..last_dollar],
+        log_n,
+        r,
+        p,
+        &mut hash,
+    ) != 0
+    {
+        return -1;
+    }
+    let mut encoded_hash = String::with_capacity(43);
+    scrypt_push_bytes_encoded(&mut encoded_hash, &hash);
+    let mut expected = bytes[..last_dollar].to_vec();
+    expected.push(b'$');
+    expected.extend_from_slice(encoded_hash.as_bytes());
+    if ct_eq(&expected, bytes) {
+        0
+    } else {
+        -1
+    }
 }
 
 pub unsafe fn crypto_pwhash(
@@ -3546,19 +4221,25 @@ pub unsafe fn crypto_pwhash(
     memlimit: usize,
     alg: c_int,
 ) -> c_int {
-    pwhash_hash_raw(
-        opt_slice_mut(out, len_to_usize(outlen)),
-        opt_slice(passwd.cast::<u8>(), len_to_usize(passwdlen)),
-        opt_slice(salt, PWHASH_SALTBYTES),
-        opslimit,
-        memlimit,
-        alg,
+    if pwhash_algorithm(alg).is_none() {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    pwhash_argon2_raw_inner(
+        out, outlen, passwd, passwdlen, salt, opslimit, memlimit, alg, None,
     )
 }
 
-pub unsafe fn crypto_pwhash_alg_argon2i13() -> c_int { PWHASH_ALG_ARGON2I13 }
-pub unsafe fn crypto_pwhash_alg_argon2id13() -> c_int { PWHASH_ALG_ARGON2ID13 }
-pub unsafe fn crypto_pwhash_alg_default() -> c_int { PWHASH_ALG_DEFAULT }
+pub unsafe fn crypto_pwhash_alg_argon2i13() -> c_int {
+    PWHASH_ALG_ARGON2I13
+}
+pub unsafe fn crypto_pwhash_alg_argon2id13() -> c_int {
+    PWHASH_ALG_ARGON2ID13
+}
+pub unsafe fn crypto_pwhash_alg_default() -> c_int {
+    PWHASH_ALG_DEFAULT
+}
+
 pub unsafe fn crypto_pwhash_argon2i(
     out: *mut u8,
     outlen: u64,
@@ -3569,27 +4250,68 @@ pub unsafe fn crypto_pwhash_argon2i(
     memlimit: usize,
     alg: c_int,
 ) -> c_int {
-    if alg != PWHASH_ALG_ARGON2I13 {
-        return -1;
-    }
-    crypto_pwhash(out, outlen, passwd, passwdlen, salt, opslimit, memlimit, alg)
+    pwhash_argon2_raw_inner(
+        out,
+        outlen,
+        passwd,
+        passwdlen,
+        salt,
+        opslimit,
+        memlimit,
+        alg,
+        Some(PWHASH_ALG_ARGON2I13),
+    )
 }
-pub unsafe fn crypto_pwhash_argon2i_alg_argon2i13() -> c_int { PWHASH_ALG_ARGON2I13 }
-pub unsafe fn crypto_pwhash_argon2i_bytes_max() -> usize { PWHASH_BYTES_MAX }
-pub unsafe fn crypto_pwhash_argon2i_bytes_min() -> usize { PWHASH_BYTES_MIN }
-pub unsafe fn crypto_pwhash_argon2i_memlimit_interactive() -> usize { PWHASH_ARGON2I_MEMLIMIT_INTERACTIVE }
-pub unsafe fn crypto_pwhash_argon2i_memlimit_max() -> usize { PWHASH_MEMLIMIT_MAX }
-pub unsafe fn crypto_pwhash_argon2i_memlimit_min() -> usize { PWHASH_MEMLIMIT_MIN }
-pub unsafe fn crypto_pwhash_argon2i_memlimit_moderate() -> usize { PWHASH_ARGON2I_MEMLIMIT_MODERATE }
-pub unsafe fn crypto_pwhash_argon2i_memlimit_sensitive() -> usize { PWHASH_ARGON2I_MEMLIMIT_SENSITIVE }
-pub unsafe fn crypto_pwhash_argon2i_opslimit_interactive() -> usize { PWHASH_ARGON2I_OPSLIMIT_INTERACTIVE as usize }
-pub unsafe fn crypto_pwhash_argon2i_opslimit_max() -> usize { PWHASH_OPSLIMIT_MAX as usize }
-pub unsafe fn crypto_pwhash_argon2i_opslimit_min() -> usize { PWHASH_ARGON2I_OPSLIMIT_MIN as usize }
-pub unsafe fn crypto_pwhash_argon2i_opslimit_moderate() -> usize { PWHASH_ARGON2I_OPSLIMIT_MODERATE as usize }
-pub unsafe fn crypto_pwhash_argon2i_opslimit_sensitive() -> usize { PWHASH_ARGON2I_OPSLIMIT_SENSITIVE as usize }
-pub unsafe fn crypto_pwhash_argon2i_passwd_max() -> usize { PWHASH_PASSWD_MAX }
-pub unsafe fn crypto_pwhash_argon2i_passwd_min() -> usize { 0 }
-pub unsafe fn crypto_pwhash_argon2i_saltbytes() -> usize { PWHASH_SALTBYTES }
+
+pub unsafe fn crypto_pwhash_argon2i_alg_argon2i13() -> c_int {
+    PWHASH_ALG_ARGON2I13
+}
+pub unsafe fn crypto_pwhash_argon2i_bytes_max() -> usize {
+    PWHASH_BYTES_MAX
+}
+pub unsafe fn crypto_pwhash_argon2i_bytes_min() -> usize {
+    PWHASH_BYTES_MIN
+}
+pub unsafe fn crypto_pwhash_argon2i_memlimit_interactive() -> usize {
+    PWHASH_ARGON2I_MEMLIMIT_INTERACTIVE
+}
+pub unsafe fn crypto_pwhash_argon2i_memlimit_max() -> usize {
+    PWHASH_MEMLIMIT_MAX
+}
+pub unsafe fn crypto_pwhash_argon2i_memlimit_min() -> usize {
+    PWHASH_MEMLIMIT_MIN
+}
+pub unsafe fn crypto_pwhash_argon2i_memlimit_moderate() -> usize {
+    PWHASH_ARGON2I_MEMLIMIT_MODERATE
+}
+pub unsafe fn crypto_pwhash_argon2i_memlimit_sensitive() -> usize {
+    PWHASH_ARGON2I_MEMLIMIT_SENSITIVE
+}
+pub unsafe fn crypto_pwhash_argon2i_opslimit_interactive() -> usize {
+    PWHASH_ARGON2I_OPSLIMIT_INTERACTIVE as usize
+}
+pub unsafe fn crypto_pwhash_argon2i_opslimit_max() -> usize {
+    PWHASH_OPSLIMIT_MAX as usize
+}
+pub unsafe fn crypto_pwhash_argon2i_opslimit_min() -> usize {
+    PWHASH_ARGON2I_OPSLIMIT_MIN as usize
+}
+pub unsafe fn crypto_pwhash_argon2i_opslimit_moderate() -> usize {
+    PWHASH_ARGON2I_OPSLIMIT_MODERATE as usize
+}
+pub unsafe fn crypto_pwhash_argon2i_opslimit_sensitive() -> usize {
+    PWHASH_ARGON2I_OPSLIMIT_SENSITIVE as usize
+}
+pub unsafe fn crypto_pwhash_argon2i_passwd_max() -> usize {
+    PWHASH_PASSWD_MAX
+}
+pub unsafe fn crypto_pwhash_argon2i_passwd_min() -> usize {
+    0
+}
+pub unsafe fn crypto_pwhash_argon2i_saltbytes() -> usize {
+    PWHASH_SALTBYTES
+}
+
 pub unsafe fn crypto_pwhash_argon2i_str(
     out: *mut c_char,
     passwd: *const c_char,
@@ -3597,45 +4319,331 @@ pub unsafe fn crypto_pwhash_argon2i_str(
     opslimit: u64,
     memlimit: usize,
 ) -> c_int {
-    match pwhash_make_string(opt_slice(passwd.cast::<u8>(), len_to_usize(passwdlen)), opslimit, memlimit, PWHASH_ALG_ARGON2I13) {
-        Some(s) => write_c_string(out, PWHASH_STRBYTES, &s),
-        None => -1,
+    pwhash_argon2_str_inner(
+        out,
+        passwd,
+        passwdlen,
+        opslimit,
+        memlimit,
+        PWHASH_ALG_ARGON2I13,
+    )
+}
+
+pub unsafe fn crypto_pwhash_argon2i_str_needs_rehash(
+    str_: *const c_char,
+    opslimit: u64,
+    memlimit: usize,
+) -> c_int {
+    pwhash_argon2_needs_rehash_inner(str_, opslimit, memlimit, PWHASH_ALG_ARGON2I13)
+}
+
+pub unsafe fn crypto_pwhash_argon2i_str_verify(
+    str_: *const c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+) -> c_int {
+    pwhash_argon2_verify_inner(str_, passwd, passwdlen, PWHASH_ALG_ARGON2I13)
+}
+
+pub unsafe fn crypto_pwhash_argon2i_strbytes() -> usize {
+    PWHASH_STRBYTES
+}
+pub unsafe fn crypto_pwhash_argon2i_strprefix() -> *const c_char {
+    static_cstr(b"$argon2i$\0")
+}
+
+pub unsafe fn crypto_pwhash_argon2id(
+    out: *mut u8,
+    outlen: u64,
+    passwd: *const c_char,
+    passwdlen: u64,
+    salt: *const u8,
+    opslimit: u64,
+    memlimit: usize,
+    alg: c_int,
+) -> c_int {
+    pwhash_argon2_raw_inner(
+        out,
+        outlen,
+        passwd,
+        passwdlen,
+        salt,
+        opslimit,
+        memlimit,
+        alg,
+        Some(PWHASH_ALG_ARGON2ID13),
+    )
+}
+
+pub unsafe fn crypto_pwhash_argon2id_alg_argon2id13() -> c_int {
+    PWHASH_ALG_ARGON2ID13
+}
+pub unsafe fn crypto_pwhash_argon2id_bytes_max() -> usize {
+    PWHASH_BYTES_MAX
+}
+pub unsafe fn crypto_pwhash_argon2id_bytes_min() -> usize {
+    PWHASH_BYTES_MIN
+}
+pub unsafe fn crypto_pwhash_argon2id_memlimit_interactive() -> usize {
+    PWHASH_ARGON2ID_MEMLIMIT_INTERACTIVE
+}
+pub unsafe fn crypto_pwhash_argon2id_memlimit_max() -> usize {
+    PWHASH_MEMLIMIT_MAX
+}
+pub unsafe fn crypto_pwhash_argon2id_memlimit_min() -> usize {
+    PWHASH_MEMLIMIT_MIN
+}
+pub unsafe fn crypto_pwhash_argon2id_memlimit_moderate() -> usize {
+    PWHASH_ARGON2ID_MEMLIMIT_MODERATE
+}
+pub unsafe fn crypto_pwhash_argon2id_memlimit_sensitive() -> usize {
+    PWHASH_ARGON2ID_MEMLIMIT_SENSITIVE
+}
+pub unsafe fn crypto_pwhash_argon2id_opslimit_interactive() -> usize {
+    PWHASH_ARGON2ID_OPSLIMIT_INTERACTIVE as usize
+}
+pub unsafe fn crypto_pwhash_argon2id_opslimit_max() -> usize {
+    PWHASH_OPSLIMIT_MAX as usize
+}
+pub unsafe fn crypto_pwhash_argon2id_opslimit_min() -> usize {
+    PWHASH_ARGON2ID_OPSLIMIT_MIN as usize
+}
+pub unsafe fn crypto_pwhash_argon2id_opslimit_moderate() -> usize {
+    PWHASH_ARGON2ID_OPSLIMIT_MODERATE as usize
+}
+pub unsafe fn crypto_pwhash_argon2id_opslimit_sensitive() -> usize {
+    PWHASH_ARGON2ID_OPSLIMIT_SENSITIVE as usize
+}
+pub unsafe fn crypto_pwhash_argon2id_passwd_max() -> usize {
+    PWHASH_PASSWD_MAX
+}
+pub unsafe fn crypto_pwhash_argon2id_passwd_min() -> usize {
+    0
+}
+pub unsafe fn crypto_pwhash_argon2id_saltbytes() -> usize {
+    PWHASH_SALTBYTES
+}
+
+pub unsafe fn crypto_pwhash_argon2id_str(
+    out: *mut c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+    opslimit: u64,
+    memlimit: usize,
+) -> c_int {
+    pwhash_argon2_str_inner(
+        out,
+        passwd,
+        passwdlen,
+        opslimit,
+        memlimit,
+        PWHASH_ALG_ARGON2ID13,
+    )
+}
+
+pub unsafe fn crypto_pwhash_argon2id_str_needs_rehash(
+    str_: *const c_char,
+    opslimit: u64,
+    memlimit: usize,
+) -> c_int {
+    pwhash_argon2_needs_rehash_inner(str_, opslimit, memlimit, PWHASH_ALG_ARGON2ID13)
+}
+
+pub unsafe fn crypto_pwhash_argon2id_str_verify(
+    str_: *const c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+) -> c_int {
+    pwhash_argon2_verify_inner(str_, passwd, passwdlen, PWHASH_ALG_ARGON2ID13)
+}
+
+pub unsafe fn crypto_pwhash_argon2id_strbytes() -> usize {
+    PWHASH_STRBYTES
+}
+pub unsafe fn crypto_pwhash_argon2id_strprefix() -> *const c_char {
+    static_cstr(b"$argon2id$\0")
+}
+pub unsafe fn crypto_pwhash_bytes_max() -> usize {
+    PWHASH_BYTES_MAX
+}
+pub unsafe fn crypto_pwhash_bytes_min() -> usize {
+    PWHASH_BYTES_MIN
+}
+pub unsafe fn crypto_pwhash_memlimit_interactive() -> usize {
+    PWHASH_ARGON2ID_MEMLIMIT_INTERACTIVE
+}
+pub unsafe fn crypto_pwhash_memlimit_max() -> usize {
+    PWHASH_MEMLIMIT_MAX
+}
+pub unsafe fn crypto_pwhash_memlimit_min() -> usize {
+    PWHASH_MEMLIMIT_MIN
+}
+pub unsafe fn crypto_pwhash_memlimit_moderate() -> usize {
+    PWHASH_ARGON2ID_MEMLIMIT_MODERATE
+}
+pub unsafe fn crypto_pwhash_memlimit_sensitive() -> usize {
+    PWHASH_ARGON2ID_MEMLIMIT_SENSITIVE
+}
+pub unsafe fn crypto_pwhash_opslimit_interactive() -> usize {
+    PWHASH_ARGON2ID_OPSLIMIT_INTERACTIVE as usize
+}
+pub unsafe fn crypto_pwhash_opslimit_max() -> usize {
+    PWHASH_OPSLIMIT_MAX as usize
+}
+pub unsafe fn crypto_pwhash_opslimit_min() -> usize {
+    PWHASH_ARGON2ID_OPSLIMIT_MIN as usize
+}
+pub unsafe fn crypto_pwhash_opslimit_moderate() -> usize {
+    PWHASH_ARGON2ID_OPSLIMIT_MODERATE as usize
+}
+pub unsafe fn crypto_pwhash_opslimit_sensitive() -> usize {
+    PWHASH_ARGON2ID_OPSLIMIT_SENSITIVE as usize
+}
+pub unsafe fn crypto_pwhash_passwd_max() -> usize {
+    PWHASH_PASSWD_MAX
+}
+pub unsafe fn crypto_pwhash_passwd_min() -> usize {
+    0
+}
+pub unsafe fn crypto_pwhash_primitive() -> *const c_char {
+    static_cstr(b"argon2i\0")
+}
+pub unsafe fn crypto_pwhash_saltbytes() -> usize {
+    PWHASH_SALTBYTES
+}
+
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256(
+    out: *mut u8,
+    outlen: u64,
+    passwd: *const c_char,
+    passwdlen: u64,
+    salt: *const u8,
+    opslimit: u64,
+    memlimit: usize,
+) -> c_int {
+    pwhash_scrypt_inner(out, outlen, passwd, passwdlen, salt, opslimit, memlimit)
+}
+
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_bytes_max() -> usize {
+    PWHASH_SCRYPT_BYTES_MAX
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_bytes_min() -> usize {
+    PWHASH_SCRYPT_BYTES_MIN
+}
+
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_ll(
+    passwd: *const u8,
+    passwdlen: usize,
+    salt: *const u8,
+    saltlen: usize,
+    n: u64,
+    r: u32,
+    p: u32,
+    buf: *mut u8,
+    buflen: usize,
+) -> c_int {
+    let Some(log_n) = n.checked_ilog2().and_then(|value| u8::try_from(value).ok()) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    if n == 0 || (1u64 << log_n) != n {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    scrypt_hash_inner(
+        opt_slice(passwd, passwdlen),
+        opt_slice(salt, saltlen),
+        log_n,
+        r,
+        p,
+        opt_slice_mut(buf, buflen),
+    )
+}
+
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_memlimit_interactive() -> usize {
+    PWHASH_SCRYPT_MEMLIMIT_INTERACTIVE
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_memlimit_max() -> usize {
+    PWHASH_SCRYPT_MEMLIMIT_MAX
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_memlimit_min() -> usize {
+    PWHASH_SCRYPT_MEMLIMIT_MIN
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_memlimit_sensitive() -> usize {
+    PWHASH_SCRYPT_MEMLIMIT_SENSITIVE
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_opslimit_interactive() -> usize {
+    PWHASH_SCRYPT_OPSLIMIT_INTERACTIVE as usize
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_opslimit_max() -> usize {
+    PWHASH_SCRYPT_OPSLIMIT_MAX as usize
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_opslimit_min() -> usize {
+    PWHASH_SCRYPT_OPSLIMIT_MIN as usize
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_opslimit_sensitive() -> usize {
+    PWHASH_SCRYPT_OPSLIMIT_SENSITIVE as usize
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_passwd_max() -> usize {
+    usize::MAX
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_passwd_min() -> usize {
+    0
+}
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_saltbytes() -> usize {
+    PWHASH_SCRYPT_SALTBYTES
+}
+
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_str(
+    out: *mut c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+    opslimit: u64,
+    memlimit: usize,
+) -> c_int {
+    pwhash_scrypt_str_inner(out, passwd, passwdlen, opslimit, memlimit)
+}
+
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_str_needs_rehash(
+    str_: *const c_char,
+    opslimit: u64,
+    memlimit: usize,
+) -> c_int {
+    let (log_n, r, p) = scrypt_pickparams(opslimit, memlimit);
+    if c_strnlen(str_, PWHASH_SCRYPT_STRBYTES) != PWHASH_SCRYPT_STRBYTES - 1 {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+    let Some(encoded) = read_c_string(str_) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    let Some((actual_log_n, actual_r, actual_p)) = scrypt_parse_setting(encoded.as_bytes()) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    if actual_log_n != log_n || actual_r != r || actual_p != p {
+        1
+    } else {
+        0
     }
 }
-pub unsafe fn crypto_pwhash_argon2i_str_needs_rehash(str_: *const c_char, opslimit: u64, memlimit: usize) -> c_int {
-    match read_c_string(str_).and_then(|s| pwhash_parse_string(&s)) {
-        Some((alg, ops, mem, _, _)) if alg == PWHASH_ALG_ARGON2I13 && ops == opslimit && mem == memlimit => 0,
-        Some(_) => 1,
-        None => -1,
-    }
+
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_str_verify(
+    str_: *const c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+) -> c_int {
+    pwhash_scrypt_verify_inner(str_, passwd, passwdlen)
 }
-pub unsafe fn crypto_pwhash_argon2i_str_verify(str_: *const c_char, passwd: *const c_char, passwdlen: u64) -> c_int {
-    match read_c_string(str_).and_then(|s| pwhash_parse_string(&s)) {
-        Some((alg, ops, mem, salt, expected)) if alg == PWHASH_ALG_ARGON2I13 => {
-            let mut actual = vec![0u8; expected.len()];
-            if pwhash_hash_raw(&mut actual, opt_slice(passwd.cast::<u8>(), len_to_usize(passwdlen)), &salt, ops, mem, alg) == 0 && ct_eq(&actual, &expected) { 0 } else { -1 }
-        }
-        _ => -1,
-    }
+
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_strbytes() -> usize {
+    PWHASH_SCRYPT_STRBYTES
 }
-pub unsafe fn crypto_pwhash_argon2i_strbytes() -> usize { PWHASH_STRBYTES }
-pub unsafe fn crypto_pwhash_argon2i_strprefix() -> *const c_char { static_cstr(b"$argon2i$\0") }
-pub unsafe fn crypto_pwhash_bytes_max() -> usize { PWHASH_BYTES_MAX }
-pub unsafe fn crypto_pwhash_bytes_min() -> usize { PWHASH_BYTES_MIN }
-pub unsafe fn crypto_pwhash_memlimit_interactive() -> usize { PWHASH_ARGON2ID_MEMLIMIT_INTERACTIVE }
-pub unsafe fn crypto_pwhash_memlimit_max() -> usize { PWHASH_MEMLIMIT_MAX }
-pub unsafe fn crypto_pwhash_memlimit_min() -> usize { PWHASH_MEMLIMIT_MIN }
-pub unsafe fn crypto_pwhash_memlimit_moderate() -> usize { PWHASH_ARGON2ID_MEMLIMIT_MODERATE }
-pub unsafe fn crypto_pwhash_memlimit_sensitive() -> usize { PWHASH_ARGON2ID_MEMLIMIT_SENSITIVE }
-pub unsafe fn crypto_pwhash_opslimit_interactive() -> usize { PWHASH_ARGON2ID_OPSLIMIT_INTERACTIVE as usize }
-pub unsafe fn crypto_pwhash_opslimit_max() -> usize { PWHASH_OPSLIMIT_MAX as usize }
-pub unsafe fn crypto_pwhash_opslimit_min() -> usize { PWHASH_ARGON2ID_OPSLIMIT_MIN as usize }
-pub unsafe fn crypto_pwhash_opslimit_moderate() -> usize { PWHASH_ARGON2ID_OPSLIMIT_MODERATE as usize }
-pub unsafe fn crypto_pwhash_opslimit_sensitive() -> usize { PWHASH_ARGON2ID_OPSLIMIT_SENSITIVE as usize }
-pub unsafe fn crypto_pwhash_passwd_max() -> usize { PWHASH_PASSWD_MAX }
-pub unsafe fn crypto_pwhash_passwd_min() -> usize { 0 }
-pub unsafe fn crypto_pwhash_primitive() -> *const c_char { static_cstr(b"argon2i\0") }
-pub unsafe fn crypto_pwhash_saltbytes() -> usize { PWHASH_SALTBYTES }
+pub unsafe fn crypto_pwhash_scryptsalsa208sha256_strprefix() -> *const c_char {
+    static_cstr(b"$7$\0")
+}
+
 pub unsafe fn crypto_pwhash_str(
     out: *mut c_char,
     passwd: *const c_char,
@@ -3643,8 +4651,16 @@ pub unsafe fn crypto_pwhash_str(
     opslimit: u64,
     memlimit: usize,
 ) -> c_int {
-    crypto_pwhash_str_alg(out, passwd, passwdlen, opslimit, memlimit, PWHASH_ALG_DEFAULT)
+    crypto_pwhash_str_alg(
+        out,
+        passwd,
+        passwdlen,
+        opslimit,
+        memlimit,
+        PWHASH_ALG_DEFAULT,
+    )
 }
+
 pub unsafe fn crypto_pwhash_str_alg(
     out: *mut c_char,
     passwd: *const c_char,
@@ -3653,26 +4669,55 @@ pub unsafe fn crypto_pwhash_str_alg(
     memlimit: usize,
     alg: c_int,
 ) -> c_int {
-    match pwhash_make_string(opt_slice(passwd.cast::<u8>(), len_to_usize(passwdlen)), opslimit, memlimit, alg) {
-        Some(s) => write_c_string(out, PWHASH_STRBYTES, &s),
-        None => -1,
-    }
-}
-pub unsafe fn crypto_pwhash_str_needs_rehash(str_: *const c_char, opslimit: u64, memlimit: usize) -> c_int {
-    match read_c_string(str_).and_then(|s| pwhash_parse_string(&s)) {
-        Some((alg, ops, mem, _, _)) if alg == PWHASH_ALG_ARGON2ID13 && ops == opslimit && mem == memlimit => 0,
-        Some(_) => 1,
-        None => -1,
-    }
-}
-pub unsafe fn crypto_pwhash_str_verify(str_: *const c_char, passwd: *const c_char, passwdlen: u64) -> c_int {
-    match read_c_string(str_).and_then(|s| pwhash_parse_string(&s)) {
-        Some((alg, ops, mem, salt, expected)) => {
-            let mut actual = vec![0u8; expected.len()];
-            if pwhash_hash_raw(&mut actual, opt_slice(passwd.cast::<u8>(), len_to_usize(passwdlen)), &salt, ops, mem, alg) == 0 && ct_eq(&actual, &expected) { 0 } else { -1 }
+    match alg {
+        PWHASH_ALG_ARGON2I13 | PWHASH_ALG_ARGON2ID13 => {
+            pwhash_argon2_str_inner(out, passwd, passwdlen, opslimit, memlimit, alg)
         }
-        None => -1,
+        _ => crate::foundation::core::sodium_misuse(),
     }
 }
-pub unsafe fn crypto_pwhash_strbytes() -> usize { PWHASH_STRBYTES }
-pub unsafe fn crypto_pwhash_strprefix() -> *const c_char { static_cstr(b"$argon2id$\0") }
+
+pub unsafe fn crypto_pwhash_str_needs_rehash(
+    str_: *const c_char,
+    opslimit: u64,
+    memlimit: usize,
+) -> c_int {
+    let Some(encoded) = read_c_string(str_) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    if encoded.starts_with("$argon2id$") {
+        return pwhash_argon2_needs_rehash_inner(str_, opslimit, memlimit, PWHASH_ALG_ARGON2ID13);
+    }
+    if encoded.starts_with("$argon2i$") {
+        return pwhash_argon2_needs_rehash_inner(str_, opslimit, memlimit, PWHASH_ALG_ARGON2I13);
+    }
+    set_errno(libc::EINVAL);
+    -1
+}
+
+pub unsafe fn crypto_pwhash_str_verify(
+    str_: *const c_char,
+    passwd: *const c_char,
+    passwdlen: u64,
+) -> c_int {
+    let Some(encoded) = read_c_string(str_) else {
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+    if encoded.starts_with("$argon2id$") {
+        return pwhash_argon2_verify_inner(str_, passwd, passwdlen, PWHASH_ALG_ARGON2ID13);
+    }
+    if encoded.starts_with("$argon2i$") {
+        return pwhash_argon2_verify_inner(str_, passwd, passwdlen, PWHASH_ALG_ARGON2I13);
+    }
+    set_errno(libc::EINVAL);
+    -1
+}
+
+pub unsafe fn crypto_pwhash_strbytes() -> usize {
+    PWHASH_STRBYTES
+}
+pub unsafe fn crypto_pwhash_strprefix() -> *const c_char {
+    static_cstr(b"$argon2id$\0")
+}

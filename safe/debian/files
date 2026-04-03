@@ -1,0 +1,4 @@
+libsodium-dev_1.0.18-1ubuntu0.24.04.1+safelibs1_amd64.deb libdevel optional
+libsodium23-dbgsym_1.0.18-1ubuntu0.24.04.1+safelibs1_amd64.ddeb debug optional automatic=yes
+libsodium23_1.0.18-1ubuntu0.24.04.1+safelibs1_amd64.deb libs optional
+libsodium_1.0.18-1ubuntu0.24.04.1+safelibs1_amd64.buildinfo libs optional

@@ -1,0 +1,14 @@
+Package: libsodium23-dbgsym
+Package-Type: ddeb
+Source: libsodium
+Version: 1.0.18-1ubuntu0.24.04.1+safelibs1
+Auto-Built-Package: debug-symbols
+Architecture: amd64
+Maintainer: OpenAI Codex <codex@openai.com>
+Installed-Size: 181
+Depends: libsodium23 (= 1.0.18-1ubuntu0.24.04.1+safelibs1)
+Section: debug
+Priority: optional
+Multi-Arch: same
+Description: debug symbols for libsodium23
+Build-Ids: 7c91b1c302c6a1ba8a9f2731cf8a76a22d5d7410

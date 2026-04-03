@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+PKG_VERSION := 1.0.18
+STAGING_DIR := $(CURDIR)/debian/tmp/usr
+LIBDIR := $(STAGING_DIR)/lib/$(DEB_HOST_MULTIARCH)
+INCLUDEDIR := $(STAGING_DIR)/include
+PKGCONFIG := $(CARGO_TARGET_DIR)/release/libsodium.pc
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release
+	sed \
+		-e 's|@prefix@|/usr|g' \
+		-e 's|@exec_prefix@|$${prefix}|g' \
+		-e 's|@libdir@|$${exec_prefix}/lib/$(DEB_HOST_MULTIARCH)|g' \
+		-e 's|@includedir@|$${prefix}/include|g' \
+		-e 's|@PACKAGE_NAME@|libsodium|g' \
+		-e 's|@PACKAGE_VERSION@|$(PKG_VERSION)|g' \
+		-e 's|@PKGCONFIG_LIBS_PRIVATE@||g' \
+		$(CURDIR)/packaging/libsodium.pc.in > $(PKGCONFIG)
+
+override_dh_auto_test:
+
+override_dh_auto_install:
+	rm -rf $(CURDIR)/debian/tmp
+	install -d $(LIBDIR)/pkgconfig $(INCLUDEDIR)
+	install -m 0644 $(CARGO_TARGET_DIR)/release/libsodium.a $(LIBDIR)/libsodium.a
+	install -m 0644 $(CARGO_TARGET_DIR)/release/libsodium.so $(LIBDIR)/libsodium.so.23.3.0
+	ln -sf libsodium.so.23.3.0 $(LIBDIR)/libsodium.so.23
+	ln -sf libsodium.so.23 $(LIBDIR)/libsodium.so
+	cp -a $(CURDIR)/include/. $(INCLUDEDIR)/
+	install -m 0644 $(PKGCONFIG) $(LIBDIR)/pkgconfig/libsodium.pc
+
+override_dh_auto_clean:
+	cargo clean
+	rm -rf $(CURDIR)/debian/tmp
+	rm -f $(PKGCONFIG)

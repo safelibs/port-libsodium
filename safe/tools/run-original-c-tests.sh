@@ -8,7 +8,7 @@ orig_test_dir="$repo_dir/original/test/default"
 quirks_dir="$repo_dir/original/test/quirks"
 target_dir="$safe_dir/target/release"
 
-phase3_subset=(
+phase4_subset=(
   codecs
   randombytes
   sodium_core
@@ -77,6 +77,14 @@ phase3_subset=(
   sign
   kx
   xchacha20
+  aead_aes256gcm
+  aead_aes256gcm2
+  kdf
+  keygen
+  pwhash_argon2i
+  pwhash_argon2id
+  pwhash_scrypt
+  pwhash_scrypt_ll
 )
 
 active_test_inventory() {
@@ -139,7 +147,7 @@ select_tests() {
     return
   fi
 
-  printf '%s\n' "${phase3_subset[@]}"
+  printf '%s\n' "${phase4_subset[@]}"
 }
 
 [[ -f "$target_dir/libsodium.so" ]] || {

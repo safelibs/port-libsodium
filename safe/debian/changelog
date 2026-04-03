@@ -1,0 +1,6 @@
+libsodium (1.0.18-1ubuntu0.24.04.1+safelibs1) noble; urgency=medium
+
+  * Build the safe-libsodium Rust port as installable libsodium23 and
+    libsodium-dev packages.
+
+ -- OpenAI Codex <codex@openai.com>  Fri, 03 Apr 2026 00:00:00 -0700
