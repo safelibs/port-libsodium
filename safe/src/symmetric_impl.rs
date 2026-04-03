@@ -7,7 +7,7 @@ use argon2::{
     },
     Algorithm as Argon2Algorithm, Argon2, Params as Argon2Params, Version as Argon2Version,
 };
-use blake2b_simd::{Params as Blake2bParams, State as Blake2bState};
+use blake2b_simd::{Hash as Blake2bHash, Params as Blake2bParams, State as Blake2bState};
 use chacha20::cipher::{KeyIvInit as _, StreamCipher as _, StreamCipherSeek as _};
 use chacha20::{ChaCha20, ChaCha20Legacy};
 use core::cmp;
@@ -39,6 +39,12 @@ const BLAKE2B_KEYBYTES_MAX: usize = 64;
 const BLAKE2B_KEYBYTES: usize = 32;
 const BLAKE2B_SALTBYTES: usize = 16;
 const BLAKE2B_PERSONALBYTES: usize = 16;
+
+#[repr(C)]
+struct Blake2bHashRepr {
+    bytes: [u8; BLAKE2B_BYTES_MAX],
+    len: u8,
+}
 const SALSA_SIGMA: [u8; 16] = *b"expand 32-byte k";
 const CHACHA_SIGMA: [u8; 16] = *b"expand 32-byte k";
 const STREAM_KEYBYTES: usize = 32;
@@ -296,6 +302,10 @@ unsafe fn hmac_sha512_state(
 
 unsafe fn blake2b_state(state: *mut crypto_generichash_blake2b_state) -> &'static mut Blake2bState {
     &mut *(state.cast::<Blake2bState>())
+}
+
+unsafe fn blake2b_hash_bytes(hash: &Blake2bHash) -> [u8; BLAKE2B_BYTES_MAX] {
+    (*(hash as *const Blake2bHash).cast::<Blake2bHashRepr>()).bytes
 }
 
 unsafe fn blake2b_state_finalized(state: *mut crypto_generichash_blake2b_state) -> bool {
@@ -1253,7 +1263,8 @@ pub unsafe fn crypto_generichash_blake2b(
     let mut state = params.to_state();
     state.update(opt_slice(in_, len_to_usize(inlen)));
     let hash = state.finalize();
-    opt_slice_mut(out, outlen).copy_from_slice(&hash.as_array()[..outlen]);
+    let bytes = blake2b_hash_bytes(&hash);
+    opt_slice_mut(out, outlen).copy_from_slice(&bytes[..outlen]);
     0
 }
 
@@ -1281,7 +1292,8 @@ pub unsafe fn crypto_generichash_blake2b_final(
         return -1;
     }
     let hash = blake2b_state(state).finalize();
-    opt_slice_mut(out, outlen).copy_from_slice(&hash.as_array()[..outlen]);
+    let bytes = blake2b_hash_bytes(&hash);
+    opt_slice_mut(out, outlen).copy_from_slice(&bytes[..outlen]);
     set_blake2b_state_finalized(state, true);
     0
 }
@@ -1395,7 +1407,8 @@ pub unsafe fn crypto_generichash_blake2b_salt_personal(
     let mut state = params.to_state();
     state.update(opt_slice(in_, len_to_usize(inlen)));
     let hash = state.finalize();
-    opt_slice_mut(out, outlen).copy_from_slice(&hash.as_array()[..outlen]);
+    let bytes = blake2b_hash_bytes(&hash);
+    opt_slice_mut(out, outlen).copy_from_slice(&bytes[..outlen]);
     0
 }
 
@@ -2871,6 +2884,19 @@ unsafe fn aead_poly1305_update_lengths(poly: &mut Poly1305StateRepr, adlen: usiz
     poly1305_update_repr(poly, &size_data);
 }
 
+unsafe fn aead_chacha20poly1305_checked_mlen(mlen: u64, ietf: bool) -> usize {
+    let mlen = len_to_usize(mlen);
+    let max = if ietf {
+        crypto_aead_chacha20poly1305_ietf_messagebytes_max()
+    } else {
+        crypto_aead_chacha20poly1305_messagebytes_max()
+    };
+    if mlen > max {
+        crate::foundation::core::sodium_misuse();
+    }
+    mlen
+}
+
 unsafe fn aead_chacha20poly1305_encrypt_detached_inner(
     c: *mut u8,
     mac: *mut u8,
@@ -2883,7 +2909,7 @@ unsafe fn aead_chacha20poly1305_encrypt_detached_inner(
     k: *const u8,
     ietf: bool,
 ) -> c_int {
-    let mlen = len_to_usize(mlen);
+    let mlen = aead_chacha20poly1305_checked_mlen(mlen, ietf);
     let ad = opt_slice(ad, len_to_usize(adlen));
     let mut poly_key = [0u8; 32];
     if ietf {
@@ -3054,9 +3080,10 @@ pub unsafe fn crypto_aead_chacha20poly1305_encrypt(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
+    let mlen_usize = aead_chacha20poly1305_checked_mlen(mlen, false);
     let ret = aead_chacha20poly1305_encrypt_detached_inner(
         c,
-        c.add(len_to_usize(mlen)),
+        c.add(mlen_usize),
         ptr::null_mut(),
         m,
         mlen,
@@ -3155,9 +3182,10 @@ pub unsafe fn crypto_aead_chacha20poly1305_ietf_encrypt(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
+    let mlen_usize = aead_chacha20poly1305_checked_mlen(mlen, true);
     let ret = aead_chacha20poly1305_encrypt_detached_inner(
         c,
-        c.add(len_to_usize(mlen)),
+        c.add(mlen_usize),
         ptr::null_mut(),
         m,
         mlen,
@@ -3323,6 +3351,13 @@ pub unsafe fn crypto_aead_xchacha20poly1305_ietf_encrypt(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
+    let mlen_usize = {
+        let mlen = len_to_usize(mlen);
+        if mlen > crypto_aead_xchacha20poly1305_ietf_messagebytes_max() {
+            crate::foundation::core::sodium_misuse();
+        }
+        mlen
+    };
     let subkey = hchacha20_core(
         &opt_slice(npub, 16).try_into().unwrap(),
         &opt_slice(k, 32).try_into().unwrap(),
@@ -3332,7 +3367,7 @@ pub unsafe fn crypto_aead_xchacha20poly1305_ietf_encrypt(
     nonce[4..].copy_from_slice(opt_slice(npub.add(16), 8));
     let ret = aead_chacha20poly1305_encrypt_detached_inner(
         c,
-        c.add(len_to_usize(mlen)),
+        c.add(mlen_usize),
         ptr::null_mut(),
         m,
         mlen,
@@ -3360,6 +3395,9 @@ pub unsafe fn crypto_aead_xchacha20poly1305_ietf_encrypt_detached(
     npub: *const u8,
     k: *const u8,
 ) -> c_int {
+    if len_to_usize(mlen) > crypto_aead_xchacha20poly1305_ietf_messagebytes_max() {
+        crate::foundation::core::sodium_misuse();
+    }
     let subkey = hchacha20_core(
         &opt_slice(npub, 16).try_into().unwrap(),
         &opt_slice(k, 32).try_into().unwrap(),

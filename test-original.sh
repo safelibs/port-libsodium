@@ -3,22 +3,38 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_TAG="${LIBSODIUM_ORIGINAL_TEST_IMAGE:-libsodium-original-test:ubuntu24.04}"
+MODE="safe"
 ONLY=""
 
 usage() {
   cat <<'EOF'
-usage: test-original.sh [--only <package>]
+usage: test-original.sh [--mode safe|original] [--only <package>]
 
-Builds the original libsodium from ./original inside an Ubuntu 24.04 Docker
-container, installs it into /usr/local, and then smoke-tests the direct
-dependents listed in dependents.json against that build.
+In safe mode (the default), builds the local safe Debian packages inside an
+Ubuntu 24.04 Docker container, upgrades the installed libsodium23 and
+libsodium-dev packages in place, and then smoke-tests the direct dependents
+listed in dependents.json against that package install.
 
+--mode original keeps the old /usr/local upstream build as a comparison path.
 --only runs just one dependent entry from dependents.json.
 EOF
 }
 
 while (($#)); do
   case "$1" in
+    --mode)
+      MODE="${2:?missing value for --mode}"
+      case "$MODE" in
+        safe|original)
+          ;;
+        *)
+          printf 'unknown mode: %s\n' "$MODE" >&2
+          usage >&2
+          exit 1
+          ;;
+      esac
+      shift 2
+      ;;
     --only)
       ONLY="${2:?missing value for --only}"
       shift 2
@@ -54,6 +70,7 @@ docker build -t "$IMAGE_TAG" - <<'DOCKERFILE'
 FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
+ENV PATH=/root/.cargo/bin:${PATH}
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -63,12 +80,17 @@ RUN apt-get update \
       ca-certificates \
       cargo \
       curl \
+      debhelper \
+      dpkg-dev \
       fastd \
+      fakeroot \
       jq \
       librust-libc-dev \
       librust-libsodium-sys-dev \
       librust-pkg-config-dev \
       libtool \
+      libsodium-dev \
+      libsodium23 \
       libtoxcore-dev \
       libzmq3-dev \
       minisign \
@@ -81,15 +103,19 @@ RUN apt-get update \
       qtox \
       r-base-core \
       r-cran-sodium \
+      rustc \
       ruby \
       ruby-rbnacl \
       shadowsocks-libev \
       vim \
       curvedns \
+ && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --profile minimal --default-toolchain stable \
  && rm -rf /var/lib/apt/lists/*
 DOCKERFILE
 
 docker run --rm -i \
+  -e "LIBSODIUM_TEST_MODE=$MODE" \
   -e "LIBSODIUM_TEST_ONLY=$ONLY" \
   -v "$ROOT":/work:ro \
   "$IMAGE_TAG" \
@@ -101,11 +127,12 @@ export LC_ALL=C.UTF-8
 
 ROOT=/work
 SRC_ROOT=/tmp/libsodium-original
+SAFE_BUILD_ROOT=/tmp/libsodium-safe
 ONLY_FILTER="${LIBSODIUM_TEST_ONLY:-}"
+MODE="${LIBSODIUM_TEST_MODE:-safe}"
 MULTIARCH="$(gcc -print-multiarch)"
-
-export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib/$MULTIARCH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/lib/$MULTIARCH/pkgconfig:/usr/local/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+EXPECTED_LIBSODIUM_PATH=""
+EXPECTED_LIBSODIUM_LIBDIR=""
 
 log_step() {
   printf '\n==> %s\n' "$1"
@@ -115,6 +142,22 @@ die() {
   echo "error: $*" >&2
   exit 1
 }
+
+case "$MODE" in
+  safe|original)
+    ;;
+  *)
+    die "unsupported mode: $MODE"
+    ;;
+esac
+
+if [[ "$MODE" == "original" ]]; then
+  export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib/$MULTIARCH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/lib/$MULTIARCH/pkgconfig:/usr/local/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+else
+  unset LD_LIBRARY_PATH || true
+  unset PKG_CONFIG_PATH || true
+fi
 
 require_contains() {
   local path="$1"
@@ -146,22 +189,46 @@ get_library_path() {
   printf '%s\n' "$path"
 }
 
-assert_uses_original_libsodium() {
+pkgconfig_libdir() {
+  pkg-config --variable=libdir libsodium
+}
+
+dpkg_libsodium_path() {
+  dpkg -L libsodium23 \
+    | awk '/\/libsodium\.so\.23(\.[0-9]+)*$/ { print }' \
+    | sort -V \
+    | tail -n1
+}
+
+assert_active_libsodium_resolution() {
+  local libdir
+  local ldconfig_path
+
+  [[ -n "$EXPECTED_LIBSODIUM_PATH" ]] || die "expected libsodium path is not configured"
+  [[ -n "$EXPECTED_LIBSODIUM_LIBDIR" ]] || die "expected libsodium libdir is not configured"
+
+  libdir="$(pkgconfig_libdir)"
+  [[ "$libdir" == "$EXPECTED_LIBSODIUM_LIBDIR" ]] \
+    || die "pkg-config resolved libsodium to $libdir, expected $EXPECTED_LIBSODIUM_LIBDIR"
+
+  ldconfig_path="$(readlink -f "$(get_library_path libsodium.so.23)")"
+  [[ "$ldconfig_path" == "$EXPECTED_LIBSODIUM_PATH" ]] \
+    || die "ldconfig resolved libsodium.so.23 to $ldconfig_path, expected $EXPECTED_LIBSODIUM_PATH"
+}
+
+assert_uses_selected_libsodium() {
   local target="$1"
   local resolved
 
   resolved="$(ldd "$target" | awk '/libsodium\.so\.23/ { print $3; exit }')"
   [[ -n "$resolved" ]] || die "ldd did not report libsodium for $target"
-
-  case "$resolved" in
-    /usr/local/lib/*|/usr/local/lib/"$MULTIARCH"/*)
-      ;;
-    *)
-      printf 'expected %s to resolve libsodium from /usr/local, got %s\n' "$target" "$resolved" >&2
-      ldd "$target" >&2
-      exit 1
-      ;;
-  esac
+  resolved="$(readlink -f "$resolved")"
+  [[ "$resolved" == "$EXPECTED_LIBSODIUM_PATH" ]] || {
+    printf 'expected %s to resolve libsodium from %s, got %s\n' \
+      "$target" "$EXPECTED_LIBSODIUM_PATH" "$resolved" >&2
+    ldd "$target" >&2
+    exit 1
+  }
 }
 
 assert_dependents_inventory() {
@@ -205,7 +272,60 @@ build_original_libsodium() {
   cd /
 
   require_contains /tmp/libsodium-install.log "Libraries have been installed in:"
-  [[ "$(pkg-config --variable=libdir libsodium)" == /usr/local/lib* ]] || die "pkg-config did not resolve the /usr/local libsodium build"
+  EXPECTED_LIBSODIUM_LIBDIR="$(pkgconfig_libdir)"
+  [[ "$EXPECTED_LIBSODIUM_LIBDIR" == /usr/local/lib* ]] \
+    || die "pkg-config did not resolve the /usr/local libsodium build"
+  EXPECTED_LIBSODIUM_PATH="$(readlink -f "$(get_library_path libsodium.so.23)")"
+  case "$EXPECTED_LIBSODIUM_PATH" in
+    /usr/local/lib/*|/usr/local/lib/"$MULTIARCH"/*)
+      ;;
+    *)
+      die "ldconfig did not resolve the /usr/local libsodium build"
+      ;;
+  esac
+  assert_active_libsodium_resolution
+}
+
+build_safe_libsodium_packages() {
+  local runtime_before
+  local dev_before
+  local runtime_after
+  local dev_after
+  local runtime_deb
+  local dev_deb
+
+  log_step "Building and installing safe libsodium packages"
+  runtime_before="$(dpkg-query -W -f='${Version}' libsodium23)"
+  dev_before="$(dpkg-query -W -f='${Version}' libsodium-dev)"
+
+  rm -rf "$SAFE_BUILD_ROOT"
+  cp -a "$ROOT" "$SAFE_BUILD_ROOT"
+  "$SAFE_BUILD_ROOT/safe/tools/build-deb.sh" >/tmp/libsodium-safe-build.log 2>&1
+
+  runtime_deb="$(find "$SAFE_BUILD_ROOT" -maxdepth 1 -type f -name 'libsodium23_*.deb' | sort | tail -n1)"
+  dev_deb="$(find "$SAFE_BUILD_ROOT" -maxdepth 1 -type f -name 'libsodium-dev_*.deb' | sort | tail -n1)"
+  [[ -n "$runtime_deb" ]] || die "missing built libsodium23 package"
+  [[ -n "$dev_deb" ]] || die "missing built libsodium-dev package"
+
+  dpkg -i "$runtime_deb" "$dev_deb" >/tmp/libsodium-safe-install.log 2>&1
+  ldconfig
+
+  runtime_after="$(dpkg-query -W -f='${Version}' libsodium23)"
+  dev_after="$(dpkg-query -W -f='${Version}' libsodium-dev)"
+  [[ "$runtime_after" != "$runtime_before" ]] \
+    || die "libsodium23 was not upgraded in place"
+  [[ "$dev_after" != "$dev_before" ]] \
+    || die "libsodium-dev was not upgraded in place"
+  [[ "$runtime_after" == *+safelibs1 ]] \
+    || die "libsodium23 did not upgrade to the safe package build"
+  [[ "$dev_after" == *+safelibs1 ]] \
+    || die "libsodium-dev did not upgrade to the safe package build"
+
+  EXPECTED_LIBSODIUM_PATH="$(readlink -f "$(dpkg_libsodium_path)")"
+  EXPECTED_LIBSODIUM_LIBDIR="$(pkgconfig_libdir)"
+  [[ "$EXPECTED_LIBSODIUM_LIBDIR" == "$(dirname "$EXPECTED_LIBSODIUM_PATH")" ]] \
+    || die "pkg-config libdir does not match the package-installed libsodium path"
+  assert_active_libsodium_resolution
 }
 
 build_tox_smoke() {
@@ -373,7 +493,7 @@ write_cargo_patch_table() {
 
 test_minisign() {
   log_step "minisign"
-  assert_uses_original_libsodium "$(command -v minisign)"
+  assert_uses_selected_libsodium "$(command -v minisign)"
 
   local work="/tmp/minisign-smoke"
   rm -rf "$work"
@@ -394,8 +514,8 @@ test_minisign() {
 
 test_shadowsocks_libev() {
   log_step "shadowsocks-libev"
-  assert_uses_original_libsodium "$(command -v ss-server)"
-  assert_uses_original_libsodium "$(command -v ss-local)"
+  assert_uses_selected_libsodium "$(command -v ss-server)"
+  assert_uses_selected_libsodium "$(command -v ss-local)"
 
   (
     set -euo pipefail
@@ -464,7 +584,7 @@ EOF
 
 test_libtoxcore2() {
   log_step "libtoxcore2"
-  assert_uses_original_libsodium "$(get_library_path libtoxcore.so.2)"
+  assert_uses_selected_libsodium "$(get_library_path libtoxcore.so.2)"
   build_tox_smoke /tmp/tox-runtime-smoke
   /tmp/tox-runtime-smoke > /tmp/tox-runtime.log 2>&1
   require_contains /tmp/tox-runtime.log "TOX_OK"
@@ -472,7 +592,7 @@ test_libtoxcore2() {
 
 test_qtox() {
   log_step "qtox"
-  assert_uses_original_libsodium "$(get_library_path libtoxcore.so.2)"
+  assert_uses_selected_libsodium "$(get_library_path libtoxcore.so.2)"
 
   local work="/tmp/qtox-smoke"
   local status
@@ -498,7 +618,7 @@ test_qtox() {
 
 test_fastd() {
   log_step "fastd"
-  assert_uses_original_libsodium "$(command -v fastd)"
+  assert_uses_selected_libsodium "$(command -v fastd)"
   fastd --generate-key > /tmp/fastd.log 2>&1
   require_contains /tmp/fastd.log "Secret:"
   require_contains /tmp/fastd.log "Public:"
@@ -506,7 +626,7 @@ test_fastd() {
 
 test_curvedns() {
   log_step "curvedns"
-  assert_uses_original_libsodium "$(command -v curvedns)"
+  assert_uses_selected_libsodium "$(command -v curvedns)"
 
   local work="/tmp/curvedns-smoke"
   rm -rf "$work"
@@ -520,7 +640,7 @@ test_curvedns() {
 
 test_nix_bin() {
   log_step "nix-bin"
-  assert_uses_original_libsodium "$(command -v nix-store)"
+  assert_uses_selected_libsodium "$(command -v nix-store)"
 
   local work="/tmp/nix-smoke"
   rm -rf "$work"
@@ -537,7 +657,7 @@ test_nix_bin() {
 
 test_libzmq5() {
   log_step "libzmq5"
-  assert_uses_original_libsodium "$(get_library_path libzmq.so.5)"
+  assert_uses_selected_libsodium "$(get_library_path libzmq.so.5)"
   build_zmq_curve_smoke /tmp/zmq-runtime-smoke
   /tmp/zmq-runtime-smoke > /tmp/zmq-runtime.log 2>&1
   require_contains /tmp/zmq-runtime.log "ZMQ_CURVE_OK"
@@ -545,7 +665,7 @@ test_libzmq5() {
 
 test_vim() {
   log_step "vim"
-  assert_uses_original_libsodium "$(command -v vim)"
+  assert_uses_selected_libsodium "$(command -v vim)"
 
   local work="/tmp/vim-smoke"
   rm -rf "$work"
@@ -703,7 +823,14 @@ test_libzmq3_dev() {
 }
 
 assert_dependents_inventory
-build_original_libsodium
+case "$MODE" in
+  safe)
+    build_safe_libsodium_packages
+    ;;
+  original)
+    build_original_libsodium
+    ;;
+esac
 
 run_selected minisign test_minisign
 run_selected shadowsocks-libev test_shadowsocks_libev

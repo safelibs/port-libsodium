@@ -176,6 +176,7 @@ for name in "${selected[@]}"; do
     -std=c11 \
     -O2 \
     -DTEST_SRCDIR='"'"$orig_test_dir"'"' \
+    -DHAVE_CATCHABLE_ABRT=1 \
     -DHAVE_CATCHABLE_SEGV=1 \
     -I"$safe_dir/include" \
     -I"$quirks_dir" \
