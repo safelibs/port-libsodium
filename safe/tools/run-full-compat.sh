@@ -11,13 +11,13 @@ usage: $(basename "$0") [--only <package>] [--report-dir <dir>]
 
 Builds the safe Debian packages, verifies the full exported symbol set,
 re-runs all 77 legacy source-compat and relinked-object tests, and then
-executes the dependent smoke harness in --mode safe.
+executes the dependent smoke harness in --mode safe. The default report
+directory is safe/compat-reports/dependents/.
 EOF
 }
 
 only_args=()
 report_dir=""
-temp_report_dir=""
 
 while (($#)); do
   case "$1" in
@@ -51,9 +51,7 @@ die() {
 }
 
 cleanup() {
-  if [[ -n "$temp_report_dir" ]]; then
-    rm -rf "$temp_report_dir"
-  fi
+  :
 }
 
 trap cleanup EXIT
@@ -144,8 +142,7 @@ log_step "Running original object relink suite"
 
 log_step "Running safe-mode dependent smoke tests"
 if [[ -z "$report_dir" ]]; then
-  temp_report_dir="$(mktemp -d)"
-  report_dir="$temp_report_dir"
+  report_dir="$safe_dir/compat-reports/dependents"
 fi
 "$safe_dir/tools/run-dependent-matrix.sh" \
   --mode safe \

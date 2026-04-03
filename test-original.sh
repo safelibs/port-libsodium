@@ -169,6 +169,7 @@ WARN_COUNT=0
 RESULTS_FILE=""
 FAILURES_FILE=""
 LOG_DIR=""
+ARTIFACTS_DIR=""
 declare -a selected_packages=()
 
 log_step() {
@@ -244,6 +245,30 @@ require_nonempty_file() {
     printf 'expected non-empty file: %s\n' "$path" >&2
     exit 1
   fi
+}
+
+require_regex_match() {
+  local label="$1"
+  local value="$2"
+  local regex="$3"
+
+  if [[ ! "$value" =~ $regex ]]; then
+    printf 'unexpected %s: %s\n' "$label" "$value" >&2
+    exit 1
+  fi
+}
+
+extract_following_line() {
+  local path="$1"
+  local label="$2"
+
+  awk -v label="$label" '
+    $0 == label {
+      getline
+      print
+      exit
+    }
+  ' "$path"
 }
 
 get_library_path() {
@@ -355,10 +380,25 @@ setup_report_dir() {
   RESULTS_FILE="$REPORT_DIR/results.tsv"
   FAILURES_FILE="$REPORT_DIR/failures.list"
   LOG_DIR="$REPORT_DIR/logs"
+  ARTIFACTS_DIR="$REPORT_DIR/artifacts"
 
-  mkdir -p "$LOG_DIR"
+  mkdir -p "$LOG_DIR" "$ARTIFACTS_DIR"
   printf 'package\tmode\tstatus\tlog_path\n' > "$RESULTS_FILE"
   : > "$FAILURES_FILE"
+}
+
+archive_report_path() {
+  local package="$1"
+  local source_path="$2"
+  local dest_name="${3:-$(basename -- "$source_path")}"
+  local package_dir
+
+  [[ -n "$ARTIFACTS_DIR" ]] || return 0
+  [[ -e "$source_path" ]] || die "missing artifact source: $source_path"
+
+  package_dir="$ARTIFACTS_DIR/$package"
+  mkdir -p "$package_dir"
+  cp -a "$source_path" "$package_dir/$dest_name"
 }
 
 record_result() {
@@ -726,15 +766,18 @@ test_qtox() {
   assert_uses_selected_libsodium "$(get_library_path libtoxcore.so.2)"
 
   local work="/tmp/qtox-smoke"
+  local qtox_log="$work/home/.cache/qTox/qtox.log"
   local status
   rm -rf "$work"
   mkdir -p "$work/home" "$work/config"
+  install -d -m 700 "$work/runtime"
 
   set +e
   QT_QPA_PLATFORM=offscreen \
+    XDG_RUNTIME_DIR="$work/runtime" \
     HOME="$work/home" \
     XDG_CONFIG_HOME="$work/config" \
-    timeout 15 qtox > /tmp/qtox.log 2>&1
+    timeout --signal=INT --kill-after=5 12 qtox > /tmp/qtox.log 2>&1
   status=$?
   set -e
 
@@ -745,14 +788,37 @@ test_qtox() {
 
   require_contains /tmp/qtox.log "Loading settings from :/conf/qtox.ini"
   require_contains /tmp/qtox.log "commit:"
+  [[ -d "$work/config/tox" ]] || die "qtox did not create its config directory"
+  require_nonempty_file "$qtox_log"
+  require_contains "$qtox_log" "commit:"
+  archive_report_path qtox "$qtox_log"
+  echo "QTOX_PROFILE_OK"
 }
 
 test_fastd() {
   log_step "fastd"
   assert_uses_selected_libsodium "$(command -v fastd)"
+
+  local secret
+  local public
+  local derived_public
+
   fastd --generate-key > /tmp/fastd.log 2>&1
-  require_contains /tmp/fastd.log "Secret:"
-  require_contains /tmp/fastd.log "Public:"
+  secret="$(awk -F': ' '/^Secret:/ { print $2; exit }' /tmp/fastd.log)"
+  public="$(awk -F': ' '/^Public:/ { print $2; exit }' /tmp/fastd.log)"
+  require_regex_match "fastd secret key" "$secret" '^[0-9a-f]{64}$'
+  require_regex_match "fastd public key" "$public" '^[0-9a-f]{64}$'
+  [[ "$secret" != "$public" ]] || die "fastd generated identical secret and public keys"
+
+  cat > /tmp/fastd.conf <<EOF
+secret "$secret";
+EOF
+  derived_public="$(fastd -c /tmp/fastd.conf --show-key --machine-readable)"
+  [[ "$derived_public" == "$public" ]] \
+    || die "fastd --show-key derived $derived_public, expected $public"
+
+  archive_report_path fastd /tmp/fastd.log generated-keypair.log
+  echo "FASTD_KEYPAIR_OK"
 }
 
 test_curvedns() {
@@ -760,13 +826,46 @@ test_curvedns() {
   assert_uses_selected_libsodium "$(command -v curvedns)"
 
   local work="/tmp/curvedns-smoke"
+  local dns_public_key
+  local hex_public_key
+  local hex_secret_key
+  local authoritative_name
+  local stored_secret_key
+  local derived_hex_public_key
   rm -rf "$work"
   mkdir -p "$work"
 
   curvedns-keygen "$work" ns.example.com > /tmp/curvedns.log 2>&1
   require_nonempty_file "$work/env/CURVEDNS_PRIVATE_KEY"
-  require_contains /tmp/curvedns.log "DNS public key:"
-  require_contains /tmp/curvedns.log "Hex secret key:"
+  authoritative_name="$(extract_following_line /tmp/curvedns.log "Authoritative name server name:")"
+  dns_public_key="$(extract_following_line /tmp/curvedns.log "DNS public key:")"
+  hex_public_key="$(extract_following_line /tmp/curvedns.log "Hex public key:")"
+  hex_secret_key="$(extract_following_line /tmp/curvedns.log "Hex secret key:")"
+  stored_secret_key="$(tr -d '\n' < "$work/env/CURVEDNS_PRIVATE_KEY")"
+
+  require_regex_match "CurveDNS authoritative name" "$authoritative_name" '^[a-z0-9]+\.[A-Za-z0-9.-]+$'
+  require_regex_match "CurveDNS DNS public key" "$dns_public_key" '^[a-z0-9]{54}$'
+  require_regex_match "CurveDNS hex public key" "$hex_public_key" '^[0-9a-f]{64}$'
+  require_regex_match "CurveDNS hex secret key" "$hex_secret_key" '^[0-9a-f]{64}$'
+  [[ "$authoritative_name" == "$dns_public_key.ns.example.com" ]] \
+    || die "CurveDNS authoritative name did not include the generated DNS public key"
+  [[ "$stored_secret_key" == "$hex_secret_key" ]] \
+    || die "CurveDNS stored secret key did not match the generated log output"
+
+  derived_hex_public_key="$(python3 - <<EOF
+from binascii import unhexlify
+from nacl.bindings import crypto_scalarmult_base
+
+secret_key = unhexlify("$hex_secret_key")
+print(crypto_scalarmult_base(secret_key).hex())
+EOF
+)"
+  [[ "$derived_hex_public_key" == "$hex_public_key" ]] \
+    || die "CurveDNS secret key did not derive the reported public key"
+
+  archive_report_path curvedns "$work/env/CURVEDNS_PRIVATE_KEY"
+  archive_report_path curvedns /tmp/curvedns.log keygen.log
+  echo "CURVEDNS_KEYPAIR_OK"
 }
 
 test_nix_bin() {
@@ -774,6 +873,9 @@ test_nix_bin() {
   assert_uses_selected_libsodium "$(command -v nix-store)"
 
   local work="/tmp/nix-smoke"
+  local store_path
+  local public_key
+  local public_key_from_secret
   rm -rf "$work"
   mkdir -p "$work"
   cd "$work"
@@ -783,6 +885,35 @@ test_nix_bin() {
   require_nonempty_file "$work/cache.pub"
   require_contains "$work/cache.pub" "smoke.test:"
   require_contains "$work/cache.sec" "smoke.test:"
+  public_key="$(tr -d '\n' < "$work/cache.pub")"
+  public_key_from_secret="$(
+    nix key convert-secret-to-public --extra-experimental-features nix-command < "$work/cache.sec"
+  )"
+  [[ "$public_key_from_secret" == "$public_key" ]] \
+    || die "nix derived public key did not match the generated cache public key"
+
+  printf 'nix signing smoke\n' > "$work/payload.txt"
+  store_path="$(nix-store --add "$work/payload.txt")"
+  nix store sign \
+    --extra-experimental-features nix-command \
+    --key-file "$work/cache.sec" \
+    "$store_path" > /tmp/nix-sign.log 2>&1
+  require_contains /tmp/nix-sign.log "added 1 signatures"
+  nix path-info \
+    --extra-experimental-features nix-command \
+    --json "$store_path" > /tmp/nix-path-info.json
+  jq -e '. | length == 1' /tmp/nix-path-info.json >/dev/null \
+    || die "nix path-info did not return exactly one store path entry"
+  jq -e --arg key_name "smoke.test:" '
+    .[0].valid == true
+    and (.[0].signatures | any(startswith($key_name)))
+  ' /tmp/nix-path-info.json >/dev/null \
+    || die "nix store path did not retain the generated signature"
+
+  archive_report_path nix-bin "$work/cache.pub"
+  archive_report_path nix-bin "$work/cache.sec"
+  archive_report_path nix-bin /tmp/nix-path-info.json path-info.json
+  echo "NIX_SIGN_VERIFY_OK"
   cd /
 }
 
@@ -859,6 +990,7 @@ test_python3_nacl() {
   log_step "python3-nacl"
   python3 <<'EOF' > /tmp/python-nacl.log
 from nacl.secret import SecretBox
+from nacl.signing import SigningKey
 from nacl.utils import random
 
 box = SecretBox(random(SecretBox.KEY_SIZE))
@@ -866,9 +998,14 @@ message = b"hello"
 nonce = random(SecretBox.NONCE_SIZE)
 ciphertext = box.encrypt(message, nonce)
 assert box.decrypt(ciphertext) == message
-print("PYNACL_OK")
+signing_key = SigningKey.generate()
+signature = signing_key.sign(message).signature
+assert len(signature) == 64
+signing_key.verify_key.verify(message, signature)
+print("PYNACL_SIGN_VERIFY_OK")
 EOF
-  require_contains /tmp/python-nacl.log "PYNACL_OK"
+  require_contains /tmp/python-nacl.log "PYNACL_SIGN_VERIFY_OK"
+  echo "PYNACL_SIGN_VERIFY_OK"
 }
 
 test_ruby_rbnacl() {
@@ -882,9 +1019,14 @@ nonce = RbNaCl::Random.random_bytes(RbNaCl::SecretBox.nonce_bytes)
 ciphertext = box.encrypt(nonce, "hello")
 plaintext = box.decrypt(nonce, ciphertext)
 abort "decrypt failed" unless plaintext == "hello"
-puts "RBNACL_OK"
+signing_key = RbNaCl::Signatures::Ed25519::SigningKey.generate
+signature = signing_key.sign("hello")
+abort "unexpected signature length" unless signature.bytesize == 64
+signing_key.verify_key.verify(signature, "hello")
+puts "RBNACL_SIGN_VERIFY_OK"
 EOF
-  require_contains /tmp/ruby-rbnacl.log "RBNACL_OK"
+  require_contains /tmp/ruby-rbnacl.log "RBNACL_SIGN_VERIFY_OK"
+  echo "RBNACL_SIGN_VERIFY_OK"
 }
 
 test_r_cran_sodium() {

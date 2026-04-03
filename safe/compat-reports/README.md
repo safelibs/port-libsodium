@@ -13,6 +13,28 @@ package<TAB>mode<TAB>status<TAB>log_path
 - Data rows stay in the selected package order.
 - `failures.list` contains one package name per line for every `FAIL` or `WARN` row, in the same order as the corresponding `results.tsv` rows.
 
+The fixed deep-check success markers introduced for the phase-2 dependent
+runtime cases are:
+
+- `QTOX_PROFILE_OK`
+- `FASTD_KEYPAIR_OK`
+- `CURVEDNS_KEYPAIR_OK`
+- `NIX_SIGN_VERIFY_OK`
+- `PYNACL_SIGN_VERIFY_OK`
+- `RBNACL_SIGN_VERIFY_OK`
+
+Those markers only appear after the harness has completed the corresponding
+behavior validation. The `dependents/` report also has a generated artifact
+contract:
+
+- `logs/<package>.log` always contains the complete per-package execution log.
+- `artifacts/<package>/` may contain copied side effects or generated key
+  material that the package produced during its check.
+- Only `safe/compat-reports/dependents/results.tsv` and
+  `safe/compat-reports/dependents/failures.list` are phase-2 durable inputs;
+  `logs/`, `artifacts/`, and any rerun directories remain generated workspace
+  state.
+
 Tracked files in this tree are limited to:
 
 - `safe/compat-reports/.gitignore`

@@ -8,10 +8,11 @@ image_tag="${LIBSODIUM_DEPENDENT_IMAGE:-${LIBSODIUM_ORIGINAL_TEST_IMAGE:-libsodi
 
 usage() {
   cat <<EOF
-usage: $(basename "$0") --report-dir <dir> [--mode safe|original] [--only <package>] [--from-list <file>] [--strict]
+usage: $(basename "$0") [--report-dir <dir>] [--mode safe|original] [--only <package>] [--from-list <file>] [--strict]
 
 Runs the dependent compatibility matrix through test-original.sh and writes a
-deterministic report ledger under the requested report directory.
+deterministic report ledger under the requested report directory. In safe mode,
+the default report directory is safe/compat-reports/dependents/.
 EOF
 }
 
@@ -30,6 +31,17 @@ resolve_report_dir() {
   mkdir -p "$parent"
   parent="$(cd -- "$parent" && pwd)"
   printf '%s/%s\n' "$parent" "$base"
+}
+
+default_report_dir() {
+  case "$mode" in
+    safe)
+      printf '%s/compat-reports/dependents\n' "$safe_dir"
+      ;;
+    original)
+      die "missing required --report-dir in original mode"
+      ;;
+  esac
 }
 
 clear_report_dir() {
@@ -88,7 +100,6 @@ while (($#)); do
   esac
 done
 
-[[ -n "$report_dir" ]] || die "missing required --report-dir"
 [[ -z "$only" || -z "$from_list" ]] || die "--only and --from-list are mutually exclusive"
 
 case "$mode" in
@@ -99,6 +110,9 @@ case "$mode" in
     ;;
 esac
 
+if [[ -z "$report_dir" ]]; then
+  report_dir="$(default_report_dir)"
+fi
 report_dir="$(resolve_report_dir "$report_dir")"
 mkdir -p "$report_dir"
 "$safe_dir/tools/build-dependent-image.sh" --tag "$image_tag"
@@ -120,3 +134,10 @@ if [[ "$strict" == "1" ]]; then
 fi
 
 LIBSODIUM_SKIP_IMAGE_BUILD=1 "$repo_dir/test-original.sh" "${args[@]}"
+
+if [[ -s "$report_dir/failures.list" ]]; then
+  printf '\nFAIL/WARN rows persisted in %s:\n' "$report_dir/failures.list"
+  sed -n '1,200p' "$report_dir/failures.list"
+else
+  printf '\nNo FAIL or WARN rows were recorded in %s.\n' "$report_dir/failures.list"
+fi
