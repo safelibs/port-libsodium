@@ -1,0 +1,12 @@
+# Ignore everything under this tree unless it is explicitly listed below.
+*
+
+!.gitignore
+!README.md
+!issues.md
+!dependents/
+!dependents/results.tsv
+!dependents/failures.list
+!dependents-rerun/
+!dependents-rerun/results.tsv
+!dependents-rerun/failures.list

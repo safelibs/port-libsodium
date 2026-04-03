@@ -8,6 +8,7 @@ usage() {
   cat <<EOF
 usage: $(basename "$0") [--expected manifest] [--kinds kinds.tsv] [checkpoint|manifest] [library]
 
+Without arguments, this verifies the full ABI contract in cabi/expected/full.symbols.
 checkpoint may be one of: foundation, through_symmetric, through_public_key, full
 EOF
 }
@@ -55,7 +56,7 @@ done
 
 if [[ -z "$manifest" ]]; then
   if [[ ${#positionals[@]} -eq 0 ]]; then
-    manifest="$safe_dir/cabi/expected/foundation.symbols"
+    manifest="$safe_dir/cabi/expected/full.symbols"
   else
     case "${positionals[0]}" in
       foundation|through_symmetric|through_public_key|full)
@@ -68,7 +69,7 @@ if [[ -z "$manifest" ]]; then
         ;;
       *)
         if [[ ${#positionals[@]} -eq 1 ]]; then
-          manifest="$safe_dir/cabi/expected/foundation.symbols"
+          manifest="$safe_dir/cabi/expected/full.symbols"
         else
           manifest=${positionals[0]}
           positionals=("${positionals[@]:1}")

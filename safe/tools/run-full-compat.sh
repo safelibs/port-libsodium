@@ -7,7 +7,7 @@ repo_dir=$(cd -- "$safe_dir/.." && pwd)
 
 usage() {
   cat <<EOF
-usage: $(basename "$0") [--only <package>]
+usage: $(basename "$0") [--only <package>] [--report-dir <dir>]
 
 Builds the safe Debian packages, verifies the full exported symbol set,
 re-runs all 77 legacy source-compat and relinked-object tests, and then
@@ -16,11 +16,17 @@ EOF
 }
 
 only_args=()
+report_dir=""
+temp_report_dir=""
 
 while (($#)); do
   case "$1" in
     --only)
       only_args+=("$1" "${2:?missing value for --only}")
+      shift 2
+      ;;
+    --report-dir)
+      report_dir="${2:?missing value for --report-dir}"
       shift 2
       ;;
     --help|-h)
@@ -43,6 +49,14 @@ die() {
   printf 'error: %s\n' "$*" >&2
   exit 1
 }
+
+cleanup() {
+  if [[ -n "$temp_report_dir" ]]; then
+    rm -rf "$temp_report_dir"
+  fi
+}
+
+trap cleanup EXIT
 
 collect_needed_libraries() {
   local library="$1"
@@ -110,11 +124,14 @@ check_cve_fix() {
 log_step "Building Debian packages"
 "$safe_dir/tools/build-deb.sh"
 
+log_step "Building release shared object"
+cargo build --manifest-path "$safe_dir/Cargo.toml" --release
+
 log_step "Checking shared object contract"
 check_shared_object_contract
 
 log_step "Checking exported symbols"
-"$safe_dir/tools/check-symbols.sh" full
+"$safe_dir/tools/check-symbols.sh"
 
 log_step "Running CVE regression guard"
 check_cve_fix
@@ -126,4 +143,11 @@ log_step "Running original object relink suite"
 "$safe_dir/tools/relink-original-objects.sh" --all
 
 log_step "Running safe-mode dependent smoke tests"
-"$repo_dir/test-original.sh" --mode safe "${only_args[@]}"
+if [[ -z "$report_dir" ]]; then
+  temp_report_dir="$(mktemp -d)"
+  report_dir="$temp_report_dir"
+fi
+"$safe_dir/tools/run-dependent-matrix.sh" \
+  --mode safe \
+  --report-dir "$report_dir" \
+  "${only_args[@]}"

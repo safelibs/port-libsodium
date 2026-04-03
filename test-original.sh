@@ -2,13 +2,16 @@
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_TAG="${LIBSODIUM_ORIGINAL_TEST_IMAGE:-libsodium-original-test:ubuntu24.04}"
+IMAGE_TAG="${LIBSODIUM_DEPENDENT_IMAGE:-${LIBSODIUM_ORIGINAL_TEST_IMAGE:-libsodium-original-test:ubuntu24.04}}"
 MODE="safe"
 ONLY=""
+FROM_LIST=""
+REPORT_DIR=""
+STRICT=0
 
 usage() {
   cat <<'EOF'
-usage: test-original.sh [--mode safe|original] [--only <package>]
+usage: test-original.sh [--mode safe|original] [--only <package>] [--from-list <file>] [--report-dir <dir>] [--strict]
 
 In safe mode (the default), builds the local safe Debian packages inside an
 Ubuntu 24.04 Docker container, upgrades the installed libsodium23 and
@@ -17,7 +20,36 @@ listed in dependents.json against that package install.
 
 --mode original keeps the old /usr/local upstream build as a comparison path.
 --only runs just one dependent entry from dependents.json.
+--from-list reads a newline-delimited package selection file.
+--report-dir writes results.tsv, failures.list, and logs/<package>.log.
+--strict exits nonzero when any report row is FAIL or WARN.
 EOF
+}
+
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+resolve_host_dir() {
+  local input="$1"
+  local parent
+  local base
+
+  parent="$(dirname -- "$input")"
+  base="$(basename -- "$input")"
+  mkdir -p "$parent"
+  parent="$(cd -- "$parent" && pwd)"
+  printf '%s/%s\n' "$parent" "$base"
+}
+
+resolve_host_file() {
+  local input="$1"
+  local parent
+
+  [[ -f "$input" ]] || die "missing package list: $input"
+  parent="$(cd -- "$(dirname -- "$input")" && pwd)"
+  printf '%s/%s\n' "$parent" "$(basename -- "$input")"
 }
 
 while (($#)); do
@@ -39,6 +71,18 @@ while (($#)); do
       ONLY="${2:?missing value for --only}"
       shift 2
       ;;
+    --from-list)
+      FROM_LIST="${2:?missing value for --from-list}"
+      shift 2
+      ;;
+    --report-dir)
+      REPORT_DIR="${2:?missing value for --report-dir}"
+      shift 2
+      ;;
+    --strict)
+      STRICT=1
+      shift
+      ;;
     --help|-h)
       usage
       exit 0
@@ -51,75 +95,49 @@ while (($#)); do
   esac
 done
 
-command -v docker >/dev/null 2>&1 || {
-  echo "docker is required to run $0" >&2
-  exit 1
-}
+[[ -z "$ONLY" || -z "$FROM_LIST" ]] || die "--only and --from-list are mutually exclusive"
 
-[[ -d "$ROOT/original" ]] || {
-  echo "missing original source tree" >&2
-  exit 1
-}
+command -v docker >/dev/null 2>&1 || die "docker is required to run $0"
+[[ -d "$ROOT/original" ]] || die "missing original source tree"
+[[ -f "$ROOT/dependents.json" ]] || die "missing dependents.json"
 
-[[ -f "$ROOT/dependents.json" ]] || {
-  echo "missing dependents.json" >&2
-  exit 1
-}
+if [[ -n "$REPORT_DIR" ]]; then
+  REPORT_DIR="$(resolve_host_dir "$REPORT_DIR")"
+  mkdir -p "$REPORT_DIR"
+fi
 
-docker build -t "$IMAGE_TAG" - <<'DOCKERFILE'
-FROM ubuntu:24.04
+if [[ -n "$FROM_LIST" ]]; then
+  FROM_LIST="$(resolve_host_file "$FROM_LIST")"
+fi
 
-ARG DEBIAN_FRONTEND=noninteractive
-ENV PATH=/root/.cargo/bin:${PATH}
+if [[ "${LIBSODIUM_SKIP_IMAGE_BUILD:-0}" != "1" ]]; then
+  "$ROOT/safe/tools/build-dependent-image.sh" --tag "$IMAGE_TAG"
+fi
 
-RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      autoconf \
-      automake \
-      build-essential \
-      ca-certificates \
-      cargo \
-      curl \
-      debhelper \
-      dpkg-dev \
-      fastd \
-      fakeroot \
-      jq \
-      librust-libc-dev \
-      librust-libsodium-sys-dev \
-      librust-pkg-config-dev \
-      libtool \
-      libsodium-dev \
-      libsodium23 \
-      libtoxcore-dev \
-      libzmq3-dev \
-      minisign \
-      netcat-openbsd \
-      nix-bin \
-      php8.3-cli \
-      pkg-config \
-      python3 \
-      python3-nacl \
-      qtox \
-      r-base-core \
-      r-cran-sodium \
-      rustc \
-      ruby \
-      ruby-rbnacl \
-      shadowsocks-libev \
-      vim \
-      curvedns \
- && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-      | sh -s -- -y --profile minimal --default-toolchain stable \
- && rm -rf /var/lib/apt/lists/*
-DOCKERFILE
+docker_args=(
+  --rm
+  -i
+  -e "LIBSODIUM_TEST_MODE=$MODE"
+  -e "LIBSODIUM_TEST_ONLY=$ONLY"
+  -e "LIBSODIUM_TEST_STRICT=$STRICT"
+  -v "$ROOT":/work:ro
+)
 
-docker run --rm -i \
-  -e "LIBSODIUM_TEST_MODE=$MODE" \
-  -e "LIBSODIUM_TEST_ONLY=$ONLY" \
-  -v "$ROOT":/work:ro \
-  "$IMAGE_TAG" \
-  bash -s <<'CONTAINER_SCRIPT'
+if [[ -n "$FROM_LIST" ]]; then
+  docker_args+=(
+    -e "LIBSODIUM_TEST_FROM_LIST=/selection/from-list"
+    -v "$FROM_LIST":/selection/from-list:ro
+  )
+fi
+
+if [[ -n "$REPORT_DIR" ]]; then
+  docker_args+=(
+    -e "LIBSODIUM_TEST_REPORT_DIR=/reports"
+    -v "$REPORT_DIR":/reports
+  )
+fi
+
+docker run "${docker_args[@]}" "$IMAGE_TAG" bash -s <<'CONTAINER_SCRIPT'
 set -euo pipefail
 
 export LANG=C.UTF-8
@@ -129,12 +147,23 @@ ROOT=/work
 SRC_ROOT=/tmp/libsodium-original
 SAFE_BUILD_ROOT=/tmp/libsodium-safe
 ONLY_FILTER="${LIBSODIUM_TEST_ONLY:-}"
+FROM_LIST_PATH="${LIBSODIUM_TEST_FROM_LIST:-}"
 MODE="${LIBSODIUM_TEST_MODE:-safe}"
+REPORT_DIR="${LIBSODIUM_TEST_REPORT_DIR:-}"
+STRICT="${LIBSODIUM_TEST_STRICT:-0}"
 MULTIARCH="$(gcc -print-multiarch)"
 EXPECTED_LIBSODIUM_PATH=""
 EXPECTED_LIBSODIUM_LIBDIR=""
 DEPENDENTS_EXPECTED=16
 DEPENDENTS_RUN=0
+SELECTED_COUNT=0
+PASS_COUNT=0
+FAIL_COUNT=0
+WARN_COUNT=0
+RESULTS_FILE=""
+FAILURES_FILE=""
+LOG_DIR=""
+declare -a selected_packages=()
 
 log_step() {
   printf '\n==> %s\n' "$1"
@@ -150,6 +179,14 @@ case "$MODE" in
     ;;
   *)
     die "unsupported mode: $MODE"
+    ;;
+esac
+
+case "$STRICT" in
+  0|1)
+    ;;
+  *)
+    die "unsupported strict flag: $STRICT"
     ;;
 esac
 
@@ -247,23 +284,81 @@ assert_dependents_inventory() {
     diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") >&2 || true
     exit 1
   fi
-
-  if [[ -n "$ONLY_FILTER" ]]; then
-    jq -e --arg package "$ONLY_FILTER" '.dependents[] | select(.package == $package)' \
-      "$ROOT/dependents.json" >/dev/null || die "--only did not match any dependent: $ONLY_FILTER"
-  fi
 }
 
-run_selected() {
+validate_selected_package() {
   local package="$1"
-  local fn="$2"
 
-  if [[ -n "$ONLY_FILTER" && "$ONLY_FILTER" != "$package" ]]; then
-    return 0
+  jq -e --arg package "$package" '.dependents[] | select(.package == $package)' \
+    "$ROOT/dependents.json" >/dev/null || die "selection did not match any dependent: $package"
+}
+
+resolve_selected_packages() {
+  local line
+  local trimmed
+
+  selected_packages=()
+
+  if [[ -n "$ONLY_FILTER" && -n "$FROM_LIST_PATH" ]]; then
+    die "--only and --from-list are mutually exclusive"
   fi
 
-  "$fn"
-  DEPENDENTS_RUN=$((DEPENDENTS_RUN + 1))
+  if [[ -n "$ONLY_FILTER" ]]; then
+    validate_selected_package "$ONLY_FILTER"
+    selected_packages=("$ONLY_FILTER")
+  elif [[ -n "$FROM_LIST_PATH" ]]; then
+    [[ -f "$FROM_LIST_PATH" ]] || die "missing package list: $FROM_LIST_PATH"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      trimmed="${line#"${line%%[![:space:]]*}"}"
+      trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+      [[ -n "$trimmed" ]] || continue
+      validate_selected_package "$trimmed"
+      selected_packages+=("$trimmed")
+    done < "$FROM_LIST_PATH"
+  else
+    mapfile -t selected_packages < <(jq -r '.dependents[].package' "$ROOT/dependents.json")
+  fi
+
+  SELECTED_COUNT=${#selected_packages[@]}
+}
+
+setup_report_dir() {
+  [[ -n "$REPORT_DIR" ]] || return 0
+
+  RESULTS_FILE="$REPORT_DIR/results.tsv"
+  FAILURES_FILE="$REPORT_DIR/failures.list"
+  LOG_DIR="$REPORT_DIR/logs"
+
+  mkdir -p "$REPORT_DIR"
+  rm -rf "$LOG_DIR"
+  mkdir -p "$LOG_DIR"
+  printf 'package\tmode\tstatus\tlog_path\n' > "$RESULTS_FILE"
+  : > "$FAILURES_FILE"
+}
+
+record_result() {
+  local package="$1"
+  local status="$2"
+  local log_rel="$3"
+
+  printf '%s\t%s\t%s\t%s\n' "$package" "$MODE" "$status" "$log_rel" >> "$RESULTS_FILE"
+
+  case "$status" in
+    PASS)
+      PASS_COUNT=$((PASS_COUNT + 1))
+      ;;
+    FAIL)
+      FAIL_COUNT=$((FAIL_COUNT + 1))
+      printf '%s\n' "$package" >> "$FAILURES_FILE"
+      ;;
+    WARN)
+      WARN_COUNT=$((WARN_COUNT + 1))
+      printf '%s\n' "$package" >> "$FAILURES_FILE"
+      ;;
+    *)
+      die "unsupported status: $status"
+      ;;
+  esac
 }
 
 build_original_libsodium() {
@@ -481,7 +576,9 @@ EOF
 
 write_cargo_patch_table() {
   local out="$1"
-  local dir base name
+  local dir
+  local base
+  local name
   declare -A seen=()
 
   : > "$out"
@@ -527,7 +624,9 @@ test_shadowsocks_libev() {
   (
     set -euo pipefail
     local_work="$(mktemp -d)"
-    local http_pid server_pid client_pid
+    local http_pid
+    local server_pid
+    local client_pid
 
     cleanup() {
       kill "${client_pid:-}" "${server_pid:-}" "${http_pid:-}" 2>/dev/null || true
@@ -774,7 +873,8 @@ test_librust_libsodium_sys_dev() {
   log_step "librust-libsodium-sys-dev"
 
   local work="/tmp/rust-libsodium-sys-smoke"
-  local crate_dir patch_table
+  local crate_dir
+  local patch_table
   rm -rf "$work"
   mkdir -p "$work/src"
   crate_dir="$(find /usr/share/cargo/registry -maxdepth 1 -mindepth 1 -type d -name 'libsodium-sys-*' | head -n1)"
@@ -829,7 +929,109 @@ test_libzmq3_dev() {
   require_contains /tmp/zmq-dev.log "ZMQ_CURVE_OK"
 }
 
+dispatch_package() {
+  local package="$1"
+
+  case "$package" in
+    minisign)
+      test_minisign
+      ;;
+    shadowsocks-libev)
+      test_shadowsocks_libev
+      ;;
+    libtoxcore2)
+      test_libtoxcore2
+      ;;
+    qtox)
+      test_qtox
+      ;;
+    fastd)
+      test_fastd
+      ;;
+    curvedns)
+      test_curvedns
+      ;;
+    nix-bin)
+      test_nix_bin
+      ;;
+    libzmq5)
+      test_libzmq5
+      ;;
+    vim)
+      test_vim
+      ;;
+    php8.3-cli)
+      test_php8_3_cli
+      ;;
+    python3-nacl)
+      test_python3_nacl
+      ;;
+    ruby-rbnacl)
+      test_ruby_rbnacl
+      ;;
+    r-cran-sodium)
+      test_r_cran_sodium
+      ;;
+    librust-libsodium-sys-dev)
+      test_librust_libsodium_sys_dev
+      ;;
+    libtoxcore-dev)
+      test_libtoxcore_dev
+      ;;
+    libzmq3-dev)
+      test_libzmq3_dev
+      ;;
+    *)
+      die "unsupported dependent package: $package"
+      ;;
+  esac
+}
+
+run_package() {
+  local package="$1"
+  local log_rel
+  local log_path
+  local status
+  local rc
+
+  if [[ -n "$REPORT_DIR" ]]; then
+    log_rel="logs/$package.log"
+    log_path="$REPORT_DIR/$log_rel"
+
+    set +e
+    (dispatch_package "$package") >"$log_path" 2>&1
+    rc=$?
+    set -e
+
+    if [[ "$rc" -eq 0 ]]; then
+      status="PASS"
+    else
+      status="FAIL"
+    fi
+
+    record_result "$package" "$status" "$log_rel"
+    DEPENDENTS_RUN=$((DEPENDENTS_RUN + 1))
+    printf '%s\t%s\n' "$status" "$package"
+    return 0
+  fi
+
+  dispatch_package "$package"
+  DEPENDENTS_RUN=$((DEPENDENTS_RUN + 1))
+}
+
 assert_dependents_inventory
+resolve_selected_packages
+setup_report_dir
+
+if [[ "$SELECTED_COUNT" -eq 0 ]]; then
+  if [[ -n "$REPORT_DIR" ]]; then
+    printf '\nNo dependent entries were selected. Wrote header-only results to %s.\n' "$REPORT_DIR"
+  else
+    printf '\nNo dependent entries were selected.\n'
+  fi
+  exit 0
+fi
+
 case "$MODE" in
   safe)
     build_safe_libsodium_packages
@@ -839,29 +1041,26 @@ case "$MODE" in
     ;;
 esac
 
-run_selected minisign test_minisign
-run_selected shadowsocks-libev test_shadowsocks_libev
-run_selected libtoxcore2 test_libtoxcore2
-run_selected qtox test_qtox
-run_selected fastd test_fastd
-run_selected curvedns test_curvedns
-run_selected nix-bin test_nix_bin
-run_selected libzmq5 test_libzmq5
-run_selected vim test_vim
-run_selected php8.3-cli test_php8_3_cli
-run_selected python3-nacl test_python3_nacl
-run_selected ruby-rbnacl test_ruby_rbnacl
-run_selected r-cran-sodium test_r_cran_sodium
-run_selected librust-libsodium-sys-dev test_librust_libsodium_sys_dev
-run_selected libtoxcore-dev test_libtoxcore_dev
-run_selected libzmq3-dev test_libzmq3_dev
+for package in "${selected_packages[@]}"; do
+  run_package "$package"
+done
 
-if [[ -n "$ONLY_FILTER" ]]; then
-  [[ "$DEPENDENTS_RUN" -eq 1 ]] || die "expected exactly one dependent to run for --only, got $DEPENDENTS_RUN"
-  printf '\nConfirmed selected dependent entry %s passed through the modified Docker harness.\n' "$ONLY_FILTER"
-else
-  [[ "$DEPENDENTS_RUN" -eq "$DEPENDENTS_EXPECTED" ]] \
-    || die "expected $DEPENDENTS_EXPECTED dependent checks to pass, got $DEPENDENTS_RUN"
+[[ "$DEPENDENTS_RUN" -eq "$SELECTED_COUNT" ]] \
+  || die "expected $SELECTED_COUNT dependent checks to run, got $DEPENDENTS_RUN"
+
+if [[ -n "$REPORT_DIR" ]]; then
+  printf '\nCompleted %d dependent check(s): %d PASS, %d FAIL, %d WARN. Reports written to %s.\n' \
+    "$SELECTED_COUNT" "$PASS_COUNT" "$FAIL_COUNT" "$WARN_COUNT" "$REPORT_DIR"
+  if [[ "$STRICT" == "1" ]] && ((FAIL_COUNT > 0 || WARN_COUNT > 0)); then
+    exit 1
+  fi
+elif [[ "$SELECTED_COUNT" -eq 1 ]]; then
+  printf '\nConfirmed selected dependent entry %s passed through the modified Docker harness.\n' \
+    "${selected_packages[0]}"
+elif [[ "$SELECTED_COUNT" -eq "$DEPENDENTS_EXPECTED" ]]; then
   printf '\nConfirmed all 16 dependent entries in dependents.json passed through the modified Docker harness.\n'
+else
+  printf '\nConfirmed %d selected dependent entries passed through the modified Docker harness.\n' \
+    "$SELECTED_COUNT"
 fi
 CONTAINER_SCRIPT
