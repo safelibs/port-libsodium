@@ -16,6 +16,8 @@ fn run_checked(mut command: Command, context: &str) {
 fn release_cdylib_matches_foundation_symbol_manifest() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let lib_path = manifest_dir.join("target/release/libsodium.so");
+    let expected_manifest = manifest_dir.join("cabi/expected/foundation.symbols");
+    let kinds_manifest = manifest_dir.join("cabi/expected/upstream-kinds.tsv");
 
     let mut cargo = Command::new("cargo");
     cargo
@@ -26,7 +28,10 @@ fn release_cdylib_matches_foundation_symbol_manifest() {
     let mut check = Command::new(manifest_dir.join("tools/check-symbols.sh"));
     check
         .current_dir(&manifest_dir)
-        .arg("foundation")
+        .arg("--expected")
+        .arg(&expected_manifest)
+        .arg("--kinds")
+        .arg(&kinds_manifest)
         .arg(&lib_path);
     run_checked(check, "symbol check");
 }

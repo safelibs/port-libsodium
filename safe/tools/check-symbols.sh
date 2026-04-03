@@ -4,19 +4,90 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 safe_dir=$(cd -- "$script_dir/.." && pwd)
 
-checkpoint=${1:-foundation}
-library_path=${2:-$safe_dir/target/release/libsodium.so}
+usage() {
+  cat <<EOF
+usage: $(basename "$0") [--expected manifest] [--kinds kinds.tsv] [checkpoint|manifest] [library]
 
-case "$checkpoint" in
-  foundation|through_symmetric|through_public_key|full)
-    manifest="$safe_dir/cabi/expected/${checkpoint}.symbols"
-    ;;
-  *)
-    manifest=$checkpoint
-    ;;
-esac
+checkpoint may be one of: foundation, through_symmetric, through_public_key, full
+EOF
+}
 
+die() {
+  echo "$*" >&2
+  exit 1
+}
+
+manifest=""
 kinds_manifest="$safe_dir/cabi/expected/upstream-kinds.tsv"
+library_path=""
+positionals=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --expected)
+      [[ $# -ge 2 ]] || die "missing value for --expected"
+      manifest=$2
+      shift 2
+      ;;
+    --kinds)
+      [[ $# -ge 2 ]] || die "missing value for --kinds"
+      kinds_manifest=$2
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      positionals+=("$@")
+      break
+      ;;
+    -*)
+      die "unknown option: $1"
+      ;;
+    *)
+      positionals+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$manifest" ]]; then
+  if [[ ${#positionals[@]} -eq 0 ]]; then
+    manifest="$safe_dir/cabi/expected/foundation.symbols"
+  else
+    case "${positionals[0]}" in
+      foundation|through_symmetric|through_public_key|full)
+        manifest="$safe_dir/cabi/expected/${positionals[0]}.symbols"
+        positionals=("${positionals[@]:1}")
+        ;;
+      *.symbols)
+        manifest=${positionals[0]}
+        positionals=("${positionals[@]:1}")
+        ;;
+      *)
+        if [[ ${#positionals[@]} -eq 1 ]]; then
+          manifest="$safe_dir/cabi/expected/foundation.symbols"
+        else
+          manifest=${positionals[0]}
+          positionals=("${positionals[@]:1}")
+        fi
+        ;;
+    esac
+  fi
+fi
+
+if [[ -z "$library_path" ]]; then
+  if [[ ${#positionals[@]} -eq 0 ]]; then
+    library_path="$safe_dir/target/release/libsodium.so"
+  else
+    library_path=${positionals[0]}
+    positionals=("${positionals[@]:1}")
+  fi
+fi
+
+[[ ${#positionals[@]} -eq 0 ]] || die "unexpected arguments: ${positionals[*]}"
 
 [[ -f "$manifest" ]] || {
   echo "missing expected-symbol manifest: $manifest" >&2
