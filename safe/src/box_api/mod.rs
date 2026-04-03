@@ -1,0 +1,256 @@
+use crate::ffi::helpers::abort_on_panic;
+
+pub mod curve25519xchacha20poly1305;
+pub mod curve25519xsalsa20poly1305;
+
+#[no_mangle]
+pub extern "C" fn crypto_box_seedbytes() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_seedbytes() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_publickeybytes() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_publickeybytes() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_secretkeybytes() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_secretkeybytes() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_beforenmbytes() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_beforenmbytes() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_noncebytes() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_noncebytes() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_zerobytes() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_zerobytes() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_boxzerobytes() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_boxzerobytes() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_macbytes() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_macbytes() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_messagebytes_max() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_messagebytes_max() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_primitive() -> *const ::std::os::raw::c_char {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_primitive() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_seed_keypair(
+    pk: *mut ::std::os::raw::c_uchar,
+    sk: *mut ::std::os::raw::c_uchar,
+    seed: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_seed_keypair(pk, sk, seed) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_keypair(
+    pk: *mut ::std::os::raw::c_uchar,
+    sk: *mut ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_keypair(pk, sk) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_beforenm(
+    k: *mut ::std::os::raw::c_uchar,
+    pk: *const ::std::os::raw::c_uchar,
+    sk: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_beforenm(k, pk, sk) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_afternm(
+    c: *mut ::std::os::raw::c_uchar,
+    m: *const ::std::os::raw::c_uchar,
+    mlen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    k: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_afternm(c, m, mlen, n, k) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_open_afternm(
+    m: *mut ::std::os::raw::c_uchar,
+    c: *const ::std::os::raw::c_uchar,
+    clen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    k: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_open_afternm(m, c, clen, n, k) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box(
+    c: *mut ::std::os::raw::c_uchar,
+    m: *const ::std::os::raw::c_uchar,
+    mlen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    pk: *const ::std::os::raw::c_uchar,
+    sk: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box(c, m, mlen, n, pk, sk) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_open(
+    m: *mut ::std::os::raw::c_uchar,
+    c: *const ::std::os::raw::c_uchar,
+    clen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    pk: *const ::std::os::raw::c_uchar,
+    sk: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_open(m, c, clen, n, pk, sk) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_detached_afternm(
+    c: *mut ::std::os::raw::c_uchar,
+    mac: *mut ::std::os::raw::c_uchar,
+    m: *const ::std::os::raw::c_uchar,
+    mlen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    k: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe {
+        crate::public_key_impl::crypto_box_detached_afternm(c, mac, m, mlen, n, k)
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_detached(
+    c: *mut ::std::os::raw::c_uchar,
+    mac: *mut ::std::os::raw::c_uchar,
+    m: *const ::std::os::raw::c_uchar,
+    mlen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    pk: *const ::std::os::raw::c_uchar,
+    sk: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe {
+        crate::public_key_impl::crypto_box_detached(c, mac, m, mlen, n, pk, sk)
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_easy_afternm(
+    c: *mut ::std::os::raw::c_uchar,
+    m: *const ::std::os::raw::c_uchar,
+    mlen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    k: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_easy_afternm(c, m, mlen, n, k) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_easy(
+    c: *mut ::std::os::raw::c_uchar,
+    m: *const ::std::os::raw::c_uchar,
+    mlen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    pk: *const ::std::os::raw::c_uchar,
+    sk: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_easy(c, m, mlen, n, pk, sk) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_open_detached_afternm(
+    m: *mut ::std::os::raw::c_uchar,
+    c: *const ::std::os::raw::c_uchar,
+    mac: *const ::std::os::raw::c_uchar,
+    clen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    k: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe {
+        crate::public_key_impl::crypto_box_open_detached_afternm(m, c, mac, clen, n, k)
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_open_detached(
+    m: *mut ::std::os::raw::c_uchar,
+    c: *const ::std::os::raw::c_uchar,
+    mac: *const ::std::os::raw::c_uchar,
+    clen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    pk: *const ::std::os::raw::c_uchar,
+    sk: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe {
+        crate::public_key_impl::crypto_box_open_detached(m, c, mac, clen, n, pk, sk)
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_open_easy_afternm(
+    m: *mut ::std::os::raw::c_uchar,
+    c: *const ::std::os::raw::c_uchar,
+    clen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    k: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_open_easy_afternm(m, c, clen, n, k) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_open_easy(
+    m: *mut ::std::os::raw::c_uchar,
+    c: *const ::std::os::raw::c_uchar,
+    clen: ::std::os::raw::c_ulonglong,
+    n: *const ::std::os::raw::c_uchar,
+    pk: *const ::std::os::raw::c_uchar,
+    sk: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_open_easy(m, c, clen, n, pk, sk) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_sealbytes() -> usize {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_sealbytes() })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_seal(
+    c: *mut ::std::os::raw::c_uchar,
+    m: *const ::std::os::raw::c_uchar,
+    mlen: ::std::os::raw::c_ulonglong,
+    pk: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_seal(c, m, mlen, pk) })
+}
+
+#[no_mangle]
+pub extern "C" fn crypto_box_seal_open(
+    m: *mut ::std::os::raw::c_uchar,
+    c: *const ::std::os::raw::c_uchar,
+    clen: ::std::os::raw::c_ulonglong,
+    pk: *const ::std::os::raw::c_uchar,
+    sk: *const ::std::os::raw::c_uchar,
+) -> ::std::os::raw::c_int {
+    abort_on_panic(|| unsafe { crate::public_key_impl::crypto_box_seal_open(m, c, clen, pk, sk) })
+}

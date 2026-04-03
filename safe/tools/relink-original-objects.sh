@@ -7,7 +7,7 @@ repo_dir=$(cd -- "$safe_dir/.." && pwd)
 orig_test_dir="$repo_dir/original/test/default"
 target_dir="$safe_dir/target/release"
 
-phase2_subset=(
+phase3_subset=(
   codecs
   randombytes
   sodium_core
@@ -54,6 +54,28 @@ phase2_subset=(
   aead_chacha20poly13052
   aead_xchacha20poly1305
   metamorphic
+  scalarmult
+  scalarmult2
+  scalarmult5
+  scalarmult6
+  scalarmult7
+  scalarmult8
+  scalarmult_ed25519
+  scalarmult_ristretto255
+  core_ed25519
+  core_ristretto255
+  ed25519_convert
+  box
+  box2
+  box7
+  box8
+  box_easy
+  box_easy2
+  box_seed
+  box_seal
+  sign
+  kx
+  xchacha20
 )
 
 active_test_inventory() {
@@ -116,7 +138,7 @@ select_tests() {
     return
   fi
 
-  printf '%s\n' "${phase2_subset[@]}"
+  printf '%s\n' "${phase3_subset[@]}"
 }
 
 [[ -f "$target_dir/libsodium.so" ]] || {
