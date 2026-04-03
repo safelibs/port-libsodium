@@ -1,0 +1,676 @@
+{
+  "generated_at": "2026-04-03T04:27:15.992Z",
+  "as_of_date": "2026-04-02",
+  "package": {
+    "name": "libsodium",
+    "working_directory": "/home/yans/code/safelibs/ported/libsodium",
+    "source_version_in_repo": "1.0.18-1ubuntu0.24.04.1"
+  },
+  "discovery": {
+    "selection_rule": "Include only CVE records that directly affect the libsodium project/source package. Search hits that merely mention libsodium as a backend, build option, or bundled dependency are excluded.",
+    "cve_org_keyword_search": {
+      "endpoint": "https://www.cve.org/restapiv1/search",
+      "payload": {
+        "query": "libsodium",
+        "from": 0,
+        "size": 100,
+        "sort": {
+          "property": "cveId",
+          "order": "desc"
+        }
+      },
+      "search_metadata": {
+        "searchStatus": "ok",
+        "version": "2025-08-26",
+        "cveCore": "2.2.0-rc4",
+        "cveMitreCore": "2.2.0-rc2",
+        "notes": [
+          "general search text string"
+        ],
+        "queryTime_ms": 78
+      },
+      "results_total": 6,
+      "results_returned": 6,
+      "direct_libsodium_cve_ids": [
+        "CVE-2025-69277"
+      ],
+      "search_hits": [
+        {
+          "cve_id": "CVE-2026-2588",
+          "title": "Crypt::NaCl::Sodium versions through 2.001 for Perl has an integer overflow flaw on 32-bit systems",
+          "description": "Crypt::NaCl::Sodium versions through 2.001 for Perl has an integer overflow flaw on 32-bit systems.\n\nSodium.xs casts a STRLEN (size_t) to unsigned long long when passing a length pointer to libsodium functions.  On 32-bit systems size_t is typically 32-bits while an unsigned long long is at least 64-bits.",
+          "affected": [
+            {
+              "vendor": "TIMLEGGE",
+              "product": "Crypt::NaCl::Sodium",
+              "package_name": "Crypt-NaCl-Sodium",
+              "repo": "https://github.com/cpan-authors/crypt-nacl-sodium",
+              "collection_url": "https://cpan.org/modules",
+              "versions": [
+                {
+                  "version": "0",
+                  "status": "affected",
+                  "version_type": "custom",
+                  "less_than": null,
+                  "less_than_or_equal": "2.001"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cve_id": "CVE-2025-69277",
+          "title": null,
+          "description": "libsodium before ad3004e, in atypical use cases involving certain custom cryptography or untrusted data to crypto_core_ed25519_is_valid_point, mishandles checks for whether an elliptic curve point is valid because it sometimes allows points that aren't in the main cryptographic group.",
+          "affected": [
+            {
+              "vendor": "libsodium",
+              "product": "libsodium",
+              "package_name": null,
+              "repo": null,
+              "collection_url": null,
+              "versions": [
+                {
+                  "version": "0",
+                  "status": "affected",
+                  "version_type": "git",
+                  "less_than": "ad3004ec8731730e93fcfbbc824e67eadc1c1bae",
+                  "less_than_or_equal": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cve_id": "CVE-2025-62514",
+          "title": "`libparsec_crypto` does not check for weak order point of curve 25519",
+          "description": "Parsec is a cloud-based application for cryptographically secure file sharing. In versions on the 3.x branch prior to 3.6.0, `libparsec_crypto`, a component of the Parsec application, does not check for weak order point of Curve25519 when compiled with its RustCrypto backend. In practice this means an attacker in a man-in-the-middle position would be able to provide weak order points to both parties in the Diffie-Hellman exchange, resulting in a high probability to for both parties to obtain the same shared key (hence leading to a successful SAS code exchange, misleading both parties into thinking no MITM has occurred) which is also known by the attacker. Note only Parsec web is impacted (as Parsec desktop uses `libparsec_crypto` with the libsodium backend). Version 3.6.0 of Parsec patches the issue.",
+          "affected": [
+            {
+              "vendor": "Scille",
+              "product": "parsec-cloud",
+              "package_name": null,
+              "repo": null,
+              "collection_url": null,
+              "versions": [
+                {
+                  "version": ">= 3.0.0-alpha, < 3.6.0",
+                  "status": "affected",
+                  "version_type": null,
+                  "less_than": null,
+                  "less_than_or_equal": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cve_id": "CVE-2025-15444",
+          "title": "Crypt::Sodium::XS module versions prior to 0.000042, for Perl, include a vulnerable version of libsodium",
+          "description": "Crypt::Sodium::XS module versions prior to 0.000042, for Perl, include a vulnerable version of libsodium\n\nlibsodium <= 1.0.20 or a version of libsodium released before December 30, 2025 contains a vulnerability documented as CVE-2025-69277  https://www.cve.org/CVERecord?id=CVE-2025-69277 .\n\nThe libsodium vulnerability states:\n\nIn atypical use cases involving certain custom cryptography or untrusted data to crypto_core_ed25519_is_valid_point, mishandles checks for whether an elliptic curve point is valid because it sometimes allows points that aren't in the main cryptographic group.\n\n0.000042 includes a version of libsodium updated to 1.0.20-stable, released January 3, 2026, which includes a fix for the vulnerability.",
+          "affected": [
+            {
+              "vendor": "IAMB",
+              "product": "Crypt::Sodium::XS",
+              "package_name": "Crypt-Sodium-XS",
+              "repo": null,
+              "collection_url": null,
+              "versions": [
+                {
+                  "version": "0",
+                  "status": "affected",
+                  "version_type": "custom",
+                  "less_than": "0.000042",
+                  "less_than_or_equal": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cve_id": "CVE-2021-38599",
+          "title": null,
+          "description": "WAL-G before 1.1, when a non-libsodium build (e.g., one of the official binary releases published as GitHub Releases) is used, silently ignores the libsodium encryption key and uploads cleartext backups. This is arguably a Principle of Least Surprise violation because \"the user likely wanted to encrypt all file activity.\"",
+          "affected": [
+            {
+              "vendor": "n/a",
+              "product": "n/a",
+              "package_name": null,
+              "repo": null,
+              "collection_url": null,
+              "versions": [
+                {
+                  "version": "n/a",
+                  "status": "affected",
+                  "version_type": null,
+                  "less_than": null,
+                  "less_than_or_equal": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cve_id": "CVE-2020-6018",
+          "title": null,
+          "description": "Valve's Game Networking Sockets prior to version v1.2.0 improperly handles long encrypted messages in function AES_GCM_DecryptContext::Decrypt() when compiled using libsodium, leading to a Stack-Based Buffer Overflow and resulting in a memory corruption and possibly even a remote code execution.",
+          "affected": [
+            {
+              "vendor": "n/a",
+              "product": "Game Networking Sockets",
+              "package_name": null,
+              "repo": null,
+              "collection_url": null,
+              "versions": [
+                {
+                  "version": "All versions prior to v1.2.0",
+                  "status": "affected",
+                  "version_type": null,
+                  "less_than": null,
+                  "less_than_or_equal": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "excluded_mentions": [
+        {
+          "cve_id": "CVE-2026-2588",
+          "title": "Crypt::NaCl::Sodium versions through 2.001 for Perl has an integer overflow flaw on 32-bit systems",
+          "affected": [
+            {
+              "vendor": "TIMLEGGE",
+              "product": "Crypt::NaCl::Sodium",
+              "package_name": "Crypt-NaCl-Sodium",
+              "repo": "https://github.com/cpan-authors/crypt-nacl-sodium",
+              "collection_url": "https://cpan.org/modules",
+              "versions": [
+                {
+                  "version": "0",
+                  "status": "affected",
+                  "version_type": "custom",
+                  "less_than": null,
+                  "less_than_or_equal": "2.001"
+                }
+              ]
+            }
+          ],
+          "reason": "Search hit mentions libsodium, but the affected product is not the libsodium project/source package."
+        },
+        {
+          "cve_id": "CVE-2025-62514",
+          "title": "`libparsec_crypto` does not check for weak order point of curve 25519",
+          "affected": [
+            {
+              "vendor": "Scille",
+              "product": "parsec-cloud",
+              "package_name": null,
+              "repo": null,
+              "collection_url": null,
+              "versions": [
+                {
+                  "version": ">= 3.0.0-alpha, < 3.6.0",
+                  "status": "affected",
+                  "version_type": null,
+                  "less_than": null,
+                  "less_than_or_equal": null
+                }
+              ]
+            }
+          ],
+          "reason": "The vulnerable product only uses or mentions libsodium as a backend/build option; the CVE does not directly target libsodium."
+        },
+        {
+          "cve_id": "CVE-2025-15444",
+          "title": "Crypt::Sodium::XS module versions prior to 0.000042, for Perl, include a vulnerable version of libsodium",
+          "affected": [
+            {
+              "vendor": "IAMB",
+              "product": "Crypt::Sodium::XS",
+              "package_name": "Crypt-Sodium-XS",
+              "repo": null,
+              "collection_url": null,
+              "versions": [
+                {
+                  "version": "0",
+                  "status": "affected",
+                  "version_type": "custom",
+                  "less_than": "0.000042",
+                  "less_than_or_equal": null
+                }
+              ]
+            }
+          ],
+          "reason": "Downstream package bundles a vulnerable libsodium release; the CVE is assigned to the downstream package rather than to libsodium itself."
+        },
+        {
+          "cve_id": "CVE-2021-38599",
+          "title": null,
+          "affected": [
+            {
+              "vendor": "n/a",
+              "product": "n/a",
+              "package_name": null,
+              "repo": null,
+              "collection_url": null,
+              "versions": [
+                {
+                  "version": "n/a",
+                  "status": "affected",
+                  "version_type": null,
+                  "less_than": null,
+                  "less_than_or_equal": null
+                }
+              ]
+            }
+          ],
+          "reason": "The vulnerable product only uses or mentions libsodium as a backend/build option; the CVE does not directly target libsodium."
+        },
+        {
+          "cve_id": "CVE-2020-6018",
+          "title": null,
+          "affected": [
+            {
+              "vendor": "n/a",
+              "product": "Game Networking Sockets",
+              "package_name": null,
+              "repo": null,
+              "collection_url": null,
+              "versions": [
+                {
+                  "version": "All versions prior to v1.2.0",
+                  "status": "affected",
+                  "version_type": null,
+                  "less_than": null,
+                  "less_than_or_equal": null
+                }
+              ]
+            }
+          ],
+          "reason": "The vulnerable product only uses or mentions libsodium as a backend/build option; the CVE does not directly target libsodium."
+        }
+      ]
+    },
+    "debian_source_package_tracker": {
+      "url": "https://security-tracker.debian.org/tracker/libsodium",
+      "resolved_issue_ids": [
+        "CVE-2025-69277"
+      ],
+      "security_announcements": [
+        "DLA-4435-1",
+        "DSA-6094-1"
+      ],
+      "text": "Information on source package libsodium\n\n     * libsodium in the Package Tracking System\n     * libsodium in the Bug Tracking System\n     * libsodium source code\n     * libsodium in the testing migration checker\n\nAvailable versions\n\n         Release           Version\n   bullseye            1.0.18-1\n   bullseye (security) 1.0.18-1+deb11u1\n   bookworm            1.0.18-1\n   bookworm (security) 1.0.18-1+deb12u1\n   trixie              1.0.18-1+deb13u1\n   forky               1.0.18-2\n   sid                 1.0.18-2\n\nResolved issues\n\n   Bug Description\n   CVE-2025-69277 libsodium before ad3004e, in atypical use cases\n   involving certain cust ...\n\nSecurity announcements\n\n   DSA / DLA          Description\n   DLA-4435-1 libsodium - security update\n   DSA-6094-1 libsodium - security update\n     __________________________________________________________________"
+    },
+    "upstream_historical_context": {
+      "url": "https://00f.net/2025/12/30/libsodium-vulnerability/",
+      "note": "The upstream disclosure states that libsodium had zero CVEs in 13 years before this issue.",
+      "text": "A vulnerability in libsodium\n\n   December 30, 2025\n\n   Libsodium is now 13 years old!\n\n   I started that project to pursue Dan Bernstein’s desire to make\n   cryptography simple to use. That meant exposing a limited set of\n   high-level functions and parameters, providing a simple API, and\n   writing documentation for users, not cryptographers. Libsodium’s goal\n   was to expose APIs to perform operations, not low-level functions.\n   Users shouldn’t even have to know or care about what algorithms are\n   used internally. This is how I’ve always viewed libsodium.\n\n   Never breaking the APIs is also something I’m obsessed with. APIs may\n   not be great, and if I could start over from scratch, I would have made\n   them very different, but as a developer, the best APIs are not the most\n   beautifully designed ones, but the ones that you don’t have to worry\n   about because they don’t change and upgrades don’t require any changes\n   in your application either. Libsodium started from the NaCl API, and\n   still adheres to it.\n\n   These APIs exposed high-level functions, but also some lower-level\n   functions that high-level functions wrap or depend on. Over the years,\n   people started using these low-level functions directly. Libsodium\n   started to be used as a toolkit of algorithms and low-level primitives.\n\n   That made me sad, especially since it is clearly documented that only\n   APIs from builds with --enable-minimal are guaranteed to be tested and\n   stable. But after all, it makes sense. When building custom protocols,\n   having a single portable library with a consistent interface for\n   different functions is far better than importing multiple dependencies,\n   each with their own APIs and sometimes incompatibilities between them.\n\n   That’s a lot of code to maintain. It includes features and target\n   platforms I don’t use but try to support for the community. I also\n   maintain a large number of other open source projects.\n\n   Still, the security track record of libsodium is pretty good, with zero\n   CVEs in 13 years even though it has gotten a lot of scrutiny.\n\n   However, while recently experimenting with adding support for batch\n   signatures, I noticed inconsistent results with code originally written\n   in Zig. The culprit was a check that was present in a function in Zig,\n   but that I forgot to add in libsodium.\n\nThe bug\n\n   The function crypto_core_ed25519_is_valid_point(), a low-level function\n   used to check if a given elliptic curve point is valid, was supposed to\n   reject points that aren’t in the main cryptographic group, but some\n   points were slipping through.\n\nWhy does this matter?\n\n   Edwards25519 is like a special mathematical playground where\n   cryptographic operations happen.\n\n   It is used internally for Ed25519 signatures, and includes multiple\n   subgroups of different sizes (order):\n     * Order 1: just the identity (0, 1)\n     * Order 2: identity + point (0, -1)\n     * Order 4: 4 points\n     * Order 8: 8 points\n     * Order L: the “main subgroup” (L = ~2^252 points) where all\n       operations are expected to happen\n     * Order 2L, 4L, 8L: very large, but not prime order subgroups\n\n   The validation function was designed to reject points not in the main\n   subgroup. It properly rejected points in the small-order subgroups, but\n   not points in the mixed-order subgroups.\n\nWhat went wrong technically?\n\n   To check if a point is in the main subgroup (the one of order L), the\n   function multiplies it by L. If the order is L, multiplying any point\n   by L gives the identity point (the mathematical equivalent of zero).\n   So, the code does the multiplication and checks that we ended up with\n   the identity point.\n\n   Points are represented by coordinates. In the internal representation\n   used here, there are three coordinates: X, Y, and Z. The identity point\n   is represented internally with coordinates where X = 0 and Y = Z. Z can\n   be anything depending on previous operations; it doesn’t have to be 1.\n\n   The old code only checked X = 0. It forgot to verify Y = Z. This meant\n   some invalid points (where X = 0 but Y ≠ Z after the multiplication)\n   were incorrectly accepted as valid.\n\n   Concretely: take any main-subgroup point Q (for example, the output of\n   crypto_core_ed25519_random) and add the order-2 point (0, -1), or\n   equivalently negate both coordinates. Every such Q + (0, -1) would have\n   passed validation before the fix, even though it’s not in the main\n   subgroup.\n\nThe fix\n\n   The fix is trivial and adds the missing check:\n// OLD:\nreturn fe25519_iszero(pl.X);\n\n// NEW:\nfe25519_sub(t, pl.Y, pl.Z);\nreturn fe25519_iszero(pl.X) & fe25519_iszero(t);\n\n   Now it properly verifies both conditions: X must be zero and Y must\n   equal Z.\n\nWho is affected?\n\n   You may be affected if you:\n     * Use a point release <= 1.0.20 or a version of libsodium released\n       before December 30, 2025.\n     * Use crypto_core_ed25519_is_valid_point() to validate points from\n       untrusted sources\n     * Implement custom cryptography using arithmetic over the\n       Edwards25519 curve\n\n   But don’t panic. Most users are not affected.\n\n   None of the high-level APIs (crypto_sign_*) are affected; they don’t\n   even use or need that function. Scalar multiplication using\n   crypto_scalarmult_ed25519 won’t leak anything even if the public key is\n   not on the main subgroup. And public keys created with the regular\n   crypto_sign_keypair and crypto_sign_seed_keypair functions are\n   guaranteed to be on the correct subgroup.\n\nRecommendation\n\n   Support for the Ristretto255 group was added to libsodium in 2019\n   specifically to solve cofactor-related issues. With Ristretto255, if a\n   point decodes, it’s safe. No further validation is required.\n\n   If you implement custom cryptographic schemes doing arithmetic over a\n   finite field group, using Ristretto255 is recommended. It’s easier to\n   use, and as a bonus, low-level operations will run faster than over\n   Edwards25519.\n\n   If you can’t update libsodium and need an application-level workaround,\n   use the following function:\nint is_on_main_subgroup(const unsigned char p[crypto_core_ed25519_BYTES])\n{\n    /* l - 1 (group order minus 1) */\n    static const unsigned char L_1[crypto_core_ed25519_SCALARBYTES] = {\n        0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58,\n        0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10\n    };\n    /* Identity point encoding: (x=0, y=1) */\n    static const unsigned char ID[crypto_core_ed25519_BYTES] = {\n        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00\n    };\n    unsigned char t[crypto_core_ed25519_BYTES];\n    unsigned char r[crypto_core_ed25519_BYTES];\n    if (crypto_scalarmult_ed25519_noclamp(t, L_1, p) != 0 ||\n        crypto_core_ed25519_add(r, t, p) != 0) {\n        return 0;\n    }\n    return sodium_memcmp(r, ID, sizeof ID) == 0;\n}\n\nFixed packages\n\n   This issue was fixed immediately after discovery. All stable packages\n   released after December 30, 2025 include the fix:\n     * official tarballs\n     * binaries for Visual Studio\n     * binaries for MingW\n     * NuGet packages for all architectures including Android\n     * swift-sodium xcframework (but swift-sodium doesn’t expose low-level\n       functions anyway)\n     * rust libsodium-sys-stable\n     * libsodium.js\n\n   A new point release is also going to be tagged.\n\n   If libsodium is useful to you, please keep in mind that it is\n   maintained by one person, for free, in time I could spend with my\n   family or on other projects. The best way to help the project would be\n   to consider sponsoring it, which helps me dedicate more time to\n   improving it and making it great for everyone, for many more years to\n   come."
+    }
+  },
+  "cves": [
+    {
+      "cve_id": "CVE-2025-69277",
+      "directly_affects_libsodium": true,
+      "scope_note": "This is the only direct libsodium CVE identified by the official CVE.org search results and by Debian/Ubuntu source-package trackers as of 2026-04-02.",
+      "upstream_fix": {
+        "commit": "ad3004ec8731730e93fcfbbc824e67eadc1c1bae",
+        "short_commit": "ad3004e",
+        "summary": "core_ed25519_is_valid_point: check Y==Z in addition to X==0"
+      },
+      "affected_versions_summary": [
+        "The MITRE CVE record marks git versions before ad3004ec8731730e93fcfbbc824e67eadc1c1bae as affected.",
+        "The upstream disclosure says point releases <= 1.0.20 or versions released before December 30, 2025 are affected in atypical use cases involving crypto_core_ed25519_is_valid_point."
+      ],
+      "distribution_status": {
+        "ubuntu_from_cve_page": [
+          {
+            "release": "25.10 questing",
+            "status": "Fixed",
+            "version": "1.0.18-1ubuntu0.25.10.1"
+          },
+          {
+            "release": "25.04 plucky",
+            "status": "Fixed",
+            "version": "1.0.18-1ubuntu0.25.04.1"
+          },
+          {
+            "release": "24.04 LTS noble",
+            "status": "Fixed",
+            "version": "1.0.18-1ubuntu0.24.04.1"
+          },
+          {
+            "release": "22.04 LTS jammy",
+            "status": "Fixed",
+            "version": "1.0.18-1ubuntu0.22.04.1"
+          },
+          {
+            "release": "20.04 LTS focal",
+            "status": "Needs evaluation",
+            "version": null
+          },
+          {
+            "release": "18.04 LTS bionic",
+            "status": "Needs evaluation",
+            "version": null
+          },
+          {
+            "release": "16.04 LTS xenial",
+            "status": "Needs evaluation",
+            "version": null
+          }
+        ],
+        "ubuntu_from_usn": [
+          {
+            "release": "25.10 questing",
+            "package": "libsodium23",
+            "version": "1.0.18-1ubuntu0.25.10.1"
+          },
+          {
+            "release": "25.04 plucky",
+            "package": "libsodium23",
+            "version": "1.0.18-1ubuntu0.25.04.1"
+          },
+          {
+            "release": "24.04 LTS noble",
+            "package": "libsodium23",
+            "version": "1.0.18-1ubuntu0.24.04.1"
+          },
+          {
+            "release": "22.04 LTS jammy",
+            "package": "libsodium23",
+            "version": "1.0.18-1ubuntu0.22.04.1"
+          }
+        ],
+        "debian_from_cve_page": [
+          {
+            "release": "bullseye (security)",
+            "status": "fixed",
+            "version": "1.0.18-1+deb11u1",
+            "advisory": "DLA-4435-1"
+          },
+          {
+            "release": "bookworm, bullseye",
+            "status": "vulnerable",
+            "version": "1.0.18-1",
+            "advisory": null
+          },
+          {
+            "release": "bookworm (security)",
+            "status": "fixed",
+            "version": "1.0.18-1+deb12u1",
+            "advisory": "DSA-6094-1"
+          },
+          {
+            "release": "trixie (security), trixie",
+            "status": "fixed",
+            "version": "1.0.18-1+deb13u1",
+            "advisory": "DSA-6094-1"
+          },
+          {
+            "release": "forky, sid",
+            "status": "fixed",
+            "version": "1.0.18-2",
+            "advisory": null
+          }
+        ],
+        "debian_security_advisories": {
+          "DLA-4435-1": {
+            "source": "Debian LTS",
+            "fixed_versions": [
+              {
+                "release": "bullseye (security)",
+                "version": "1.0.18-1+deb11u1"
+              }
+            ]
+          },
+          "DSA-6094-1": {
+            "source": "Debian",
+            "fixed_versions": [
+              {
+                "release": "bookworm (security)",
+                "version": "1.0.18-1+deb12u1"
+              },
+              {
+                "release": "trixie (security), trixie",
+                "version": "1.0.18-1+deb13u1"
+              }
+            ]
+          }
+        }
+      },
+      "mitre_cve_record": {
+        "dataType": "CVE_RECORD",
+        "cveMetadata": {
+          "cveId": "CVE-2025-69277",
+          "assignerOrgId": "8254265b-2729-46b6-b9e3-3dfca2d5bfca",
+          "state": "PUBLISHED",
+          "assignerShortName": "mitre",
+          "dateReserved": "2025-12-31T05:50:07.155Z",
+          "datePublished": "2025-12-31T05:50:07.422Z",
+          "dateUpdated": "2026-01-07T17:06:43.302Z"
+        },
+        "containers": {
+          "cna": {
+            "affected": [
+              {
+                "defaultStatus": "unaffected",
+                "product": "libsodium",
+                "vendor": "libsodium",
+                "versions": [
+                  {
+                    "lessThan": "ad3004ec8731730e93fcfbbc824e67eadc1c1bae",
+                    "status": "affected",
+                    "version": "0",
+                    "versionType": "git"
+                  }
+                ]
+              }
+            ],
+            "descriptions": [
+              {
+                "lang": "en",
+                "value": "libsodium before ad3004e, in atypical use cases involving certain custom cryptography or untrusted data to crypto_core_ed25519_is_valid_point, mishandles checks for whether an elliptic curve point is valid because it sometimes allows points that aren't in the main cryptographic group."
+              }
+            ],
+            "metrics": [
+              {
+                "cvssV3_1": {
+                  "attackComplexity": "HIGH",
+                  "attackVector": "LOCAL",
+                  "availabilityImpact": "NONE",
+                  "baseScore": 4.5,
+                  "baseSeverity": "MEDIUM",
+                  "confidentialityImpact": "LOW",
+                  "integrityImpact": "LOW",
+                  "privilegesRequired": "NONE",
+                  "scope": "CHANGED",
+                  "userInteraction": "NONE",
+                  "vectorString": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:C/C:L/I:L/A:N",
+                  "version": "3.1"
+                },
+                "format": "CVSS",
+                "scenarios": [
+                  {
+                    "lang": "en",
+                    "value": "GENERAL"
+                  }
+                ]
+              }
+            ],
+            "problemTypes": [
+              {
+                "descriptions": [
+                  {
+                    "cweId": "CWE-184",
+                    "description": "CWE-184 Incomplete List of Disallowed Inputs",
+                    "lang": "en",
+                    "type": "CWE"
+                  }
+                ]
+              }
+            ],
+            "providerMetadata": {
+              "orgId": "8254265b-2729-46b6-b9e3-3dfca2d5bfca",
+              "shortName": "mitre",
+              "dateUpdated": "2026-01-06T16:38:46.029Z"
+            },
+            "references": [
+              {
+                "url": "https://github.com/jedisct1/libsodium/commit/ad3004ec8731730e93fcfbbc824e67eadc1c1bae"
+              },
+              {
+                "url": "https://00f.net/2025/12/30/libsodium-vulnerability/"
+              },
+              {
+                "url": "https://news.ycombinator.com/item?id=46435614"
+              },
+              {
+                "url": "https://ianix.com/pub/ed25519-deployment.html"
+              },
+              {
+                "url": "https://github.com/pyca/pynacl/issues/920"
+              },
+              {
+                "url": "https://github.com/pyca/pynacl/commit/ecf41f55a3d8f1e10ce89c61c4b4d67f3f4467cf"
+              },
+              {
+                "url": "https://github.com/pyca/pynacl/commit/96314884d88d1089ff5f336dba61d7abbcddbbf7"
+              }
+            ],
+            "x_generator": {
+              "engine": "CVE-Request-form 0.0.1"
+            }
+          },
+          "adp": [
+            {
+              "metrics": [
+                {
+                  "other": {
+                    "type": "ssvc",
+                    "content": {
+                      "timestamp": "2026-01-02T15:59:09.134600Z",
+                      "id": "CVE-2025-69277",
+                      "options": [
+                        {
+                          "Exploitation": "none"
+                        },
+                        {
+                          "Automatable": "no"
+                        },
+                        {
+                          "Technical Impact": "partial"
+                        }
+                      ],
+                      "role": "CISA Coordinator",
+                      "version": "2.0.3"
+                    }
+                  }
+                }
+              ],
+              "title": "CISA ADP Vulnrichment",
+              "providerMetadata": {
+                "orgId": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+                "shortName": "CISA-ADP",
+                "dateUpdated": "2026-01-02T17:38:32.240Z"
+              }
+            },
+            {
+              "title": "CVE Program Container",
+              "references": [
+                {
+                  "url": "https://lists.debian.org/debian-lts-announce/2026/01/msg00004.html"
+                }
+              ],
+              "providerMetadata": {
+                "orgId": "af854a3a-2127-422b-91ae-364da2661108",
+                "shortName": "CVE",
+                "dateUpdated": "2026-01-07T17:06:43.302Z"
+              }
+            }
+          ]
+        },
+        "dataVersion": "5.2"
+      },
+      "source_texts": [
+        {
+          "name": "NVD detail page",
+          "source_type": "web_text",
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-69277",
+          "retrieved_at": "2026-04-03T04:27:15.992Z",
+          "text": "CVE-2025-69277 Detail\n\n   Awaiting Analysis\n     __________________________________________________________________\n\n   This CVE record has been marked for NVD enrichment efforts.\n\nDescription\n\n   libsodium before ad3004e, in atypical use cases involving certain\n   custom cryptography or untrusted data to\n   crypto_core_ed25519_is_valid_point, mishandles checks for whether an\n   elliptic curve point is valid because it sometimes allows points that\n   aren't in the main cryptographic group.\n\nMetrics\n\n\n   (BUTTON) CVSS Version 4.0 (BUTTON) CVSS Version 3.x (BUTTON) CVSS\n   Version 2.0\n   NVD enrichment efforts reference publicly available information to\n   associate vector strings. CVSS information contributed by other sources\n   is also displayed.\n   CVSS 4.0 Severity and Vector Strings:\n   NIST CVSS score\n   NIST: NVD\n   N/A\n   NVD assessment not yet provided.\n   CVSS 3.x Severity and Vector Strings:\n   NIST CVSS score\n   NIST: NVD\n   Base Score:  N/A\n   NVD assessment not yet provided.\n   Nist CVSS score does not match with CNA score\n   CNA:  MITRE\n   Base Score:  4.5 MEDIUM\n   Vector:  CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:C/C:L/I:L/A:N\n   CVSS 2.0 Severity and Vector Strings:\n   National Institute of Standards and Technology\n   NIST: NVD\n   Base Score: N/A\n   NVD assessment not yet provided.\n\nReferences to Advisories, Solutions, and Tools\n\n   By selecting these links, you will be leaving NIST webspace. We have\n   provided these links to other web sites because they may have\n   information that would be of interest to you. No inferences should be\n   drawn on account of other sites being referenced, or not, from this\n   page. There may be other web sites that are more appropriate for your\n   purpose. NIST does not necessarily endorse the views expressed, or\n   concur with the facts presented on these sites. Further, NIST does not\n   endorse any commercial products that may be mentioned on these sites.\n   Please address comments about this page to [email protected].\n   URL Source(s) Tag(s)\n   https://00f.net/2025/12/30/libsodium-vulnerability/ MITRE\n   https://github.com/jedisct1/libsodium/commit/ad3004ec8731730e93fcfbbc82\n   4e67eadc1c1bae MITRE\n   https://github.com/pyca/pynacl/commit/96314884d88d1089ff5f336dba61d7abb\n   cddbbf7 MITRE\n   https://github.com/pyca/pynacl/commit/ecf41f55a3d8f1e10ce89c61c4b4d67f3\n   f4467cf MITRE\n   https://github.com/pyca/pynacl/issues/920 MITRE\n   https://ianix.com/pub/ed25519-deployment.html MITRE\n   https://lists.debian.org/debian-lts-announce/2026/01/msg00004.html CVE\n   https://news.ycombinator.com/item?id=46435614 MITRE\n\nWeakness Enumeration\n\n    CWE-ID               CWE Name                Source\n   CWE-184 Incomplete List of Disallowed Inputs MITRE  \n\nChange History\n\n   3 change records found show changes\n\nCVE Modified by CVE 1/07/2026 12:16:02 PM\n\n   Action   Type    Old Value New Value\n   Added  Reference\nhttps://lists.debian.org/debian-lts-announce/2026/01/msg00004.html\n\nCVE Modified by MITRE 1/06/2026 12:15:45 PM\n\n   Action   Type    Old Value New Value\n   Added  Reference\nhttps://github.com/pyca/pynacl/commit/96314884d88d1089ff5f336dba61d7abbcddbbf7\n\n   Added  Reference\nhttps://github.com/pyca/pynacl/commit/ecf41f55a3d8f1e10ce89c61c4b4d67f3f4467cf\n\n   Added  Reference\nhttps://github.com/pyca/pynacl/issues/920\n\nNew CVE Received from MITRE 12/31/2025 1:15:41 AM\n\n   Action    Type     Old Value New Value\n   Added  Description\nlibsodium before ad3004e, in atypical use cases involving certain custom cryptog\nraphy or untrusted data to crypto_core_ed25519_is_valid_point, mishandles checks\n for whether an elliptic curve point is valid because it sometimes allows points\n that aren't in the main cryptographic group.\n\n   Added  CVSS V3.1\nAV:L/AC:H/PR:N/UI:N/S:C/C:L/I:L/A:N\n\n   Added  CWE\nCWE-184\n\n   Added  Reference\nhttps://00f.net/2025/12/30/libsodium-vulnerability/\n\n   Added  Reference\nhttps://github.com/jedisct1/libsodium/commit/ad3004ec8731730e93fcfbbc824e67eadc1\nc1bae\n\n   Added  Reference\nhttps://ianix.com/pub/ed25519-deployment.html\n\n   Added  Reference\nhttps://news.ycombinator.com/item?id=46435614\n\nQuick Info\n\n   CVE Dictionary Entry:\n   CVE-2025-69277\n   NVD Published Date:\n   12/31/2025\n   NVD Last Modified:\n   01/07/2026\n   Source:\n   MITRE"
+        },
+        {
+          "name": "Ubuntu CVE page",
+          "source_type": "web_text",
+          "url": "https://ubuntu.com/security/CVE-2025-69277",
+          "retrieved_at": "2026-04-03T04:27:15.992Z",
+          "text": "CVE-2025-69277\n\n   Publication date 31 December 2025\n\n   Last updated 8 January 2026\n     __________________________________________________________________\n\n   Ubuntu priority\n\n   Medium\n\n   Why this priority?\n\nCvss 3 Severity Score\n\n   4.5 · Medium\n\n   Score breakdown\n   (BUTTON) Toggle side navigation\n   (BUTTON) Toggle table of contents\n     * Description\n     * Status\n     * Severity score breakdown\n     * References\n\nDescription\n\n   libsodium before ad3004e, in atypical use cases involving certain\n   custom cryptography or untrusted data to\n   crypto_core_ed25519_is_valid_point, mishandles checks for whether an\n   elliptic curve point is valid because it sometimes allows points that\n   aren't in the main cryptographic group.\n\nStatus\n\n   [ ] Show unmaintained releases\n\n    Package   Ubuntu Release  Status\n   libsodium 25.10 questing\n   Fixed 1.0.18-1ubuntu0.25.10.1\n             25.04 plucky\n   Fixed 1.0.18-1ubuntu0.25.04.1\n             24.04 LTS noble\n   Fixed 1.0.18-1ubuntu0.24.04.1\n             22.04 LTS jammy\n   Fixed 1.0.18-1ubuntu0.22.04.1\n             20.04 LTS focal\n   Needs evaluation\n             18.04 LTS bionic\n   Needs evaluation\n             16.04 LTS xenial\n   Needs evaluation\n     __________________________________________________________________\n\n     * How can I get the fixes?\n     * What do statuses mean?\n     * Patch details\n\nPatch details\n\n   For informational purposes only. We recommend not to cherry-pick\n   updates. How can I get the fixes?\n    Package  Patch details\n   libsodium\n     * Upstream: ad3004e\n\nSeverity score breakdown\n\n        Parameter                         Value\n       Base score      4.5 · Medium\n      Attack vector    Local\n    Attack complexity  High\n   Privileges required None\n    User interaction   None\n          Scope        Changed\n     Confidentiality   Low\n    Integrity impact   Low\n   Availability impact None\n         Vector        CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:C/C:L/I:L/A:N\n\nReferences\n\n     * MITRE\n     * NVD\n     * Launchpad\n     * Debian\n\nRelated Ubuntu Security Notices (USN)\n\n     * USN-7949-1\n     * Sodium vulnerability\n     * 8 January 2026\n\nOther references\n\n     * https://www.cve.org/CVERecord?id=CVE-2025-69277\n     * https://00f.net/2025/12/30/libsodium-vulnerability/\n     * https://ianix.com/pub/ed25519-deployment.html\n     * https://news.ycombinator.com/item?id=46435614\n     __________________________________________________________________"
+        },
+        {
+          "name": "Ubuntu security notice",
+          "source_type": "web_text",
+          "url": "https://ubuntu.com/security/notices/USN-7949-1",
+          "retrieved_at": "2026-04-03T04:27:15.992Z",
+          "text": "USN-7949-1: Sodium vulnerability\n\n   Publication date\n\n   8 January 2026\n\n   Overview\n\n   Sodium could be made to expose sensitive information.\n\n   Releases\n   25.10 25.04 24.04 LTS 22.04 LTS\n     __________________________________________________________________\n\n   (BUTTON) Open side navigation\n   (BUTTON) Close side navigation\n     * Packages\n     * Details\n     * Update instructions\n     * References\n\nPackages\n\n     * libsodium - Network communication, cryptography and signaturing\n       library\n\nDetails\n\n   It was discovered that Sodium incorrectly handled the elliptic curve\n   point\n   validity check in certain atypical use cases. This could result in\n   invalid\n   points being used, contrary to expectations.\n\n   It was discovered that Sodium incorrectly handled the elliptic curve\n   point\n   validity check in certain atypical use cases. This could result in\n   invalid\n   points being used, contrary to expectations.\n\nUpdate instructions\n\n   In general, a standard system update will make all the necessary\n   changes.\n   Learn more about how to get the fixes.\n\n   The problem can be corrected by updating your system to the following\n   package versions:\n    Ubuntu Release Package Version\n   25.10 questing  libsodium23 –  1.0.18-1ubuntu0.25.10.1\n    25.04 plucky   libsodium23 –  1.0.18-1ubuntu0.25.04.1\n   24.04 LTS noble libsodium23 –  1.0.18-1ubuntu0.24.04.1\n   22.04 LTS jammy libsodium23 –  1.0.18-1ubuntu0.22.04.1\n     __________________________________________________________________"
+        },
+        {
+          "name": "Debian source package tracker",
+          "source_type": "web_text",
+          "url": "https://security-tracker.debian.org/tracker/libsodium",
+          "retrieved_at": "2026-04-03T04:27:15.992Z",
+          "text": "Information on source package libsodium\n\n     * libsodium in the Package Tracking System\n     * libsodium in the Bug Tracking System\n     * libsodium source code\n     * libsodium in the testing migration checker\n\nAvailable versions\n\n         Release           Version\n   bullseye            1.0.18-1\n   bullseye (security) 1.0.18-1+deb11u1\n   bookworm            1.0.18-1\n   bookworm (security) 1.0.18-1+deb12u1\n   trixie              1.0.18-1+deb13u1\n   forky               1.0.18-2\n   sid                 1.0.18-2\n\nResolved issues\n\n   Bug Description\n   CVE-2025-69277 libsodium before ad3004e, in atypical use cases\n   involving certain cust ...\n\nSecurity announcements\n\n   DSA / DLA          Description\n   DLA-4435-1 libsodium - security update\n   DSA-6094-1 libsodium - security update\n     __________________________________________________________________"
+        },
+        {
+          "name": "Debian CVE tracker page",
+          "source_type": "web_text",
+          "url": "https://security-tracker.debian.org/tracker/CVE-2025-69277",
+          "retrieved_at": "2026-04-03T04:27:15.992Z",
+          "text": "CVE-2025-69277\n\n   Name CVE-2025-69277\n   Description libsodium before ad3004e, in atypical use cases involving\n   certain custom cryptography or untrusted data to\n   crypto_core_ed25519_is_valid_point, mishandles checks for whether an\n   elliptic curve point is valid because it sometimes allows points that\n   aren't in the main cryptographic group.\n   Source CVE (at NVD; CERT, ENISA, LWN, oss-sec, fulldisc, Debian ELTS,\n   Red Hat, Ubuntu, Gentoo, SUSE bugzilla/CVE, GitHub\n   advisories/code/issues, web search, more)\n   References DLA-4435-1, DSA-6094-1\n   Debian Bugs 1124374\n\nVulnerable and fixed packages\n\n   The table below lists information on source packages.\n\n   Source Package           Release              Version        Status\n   libsodium (PTS) bullseye (security)       1.0.18-1+deb11u1 fixed\n                   bookworm, bullseye        1.0.18-1         vulnerable\n                   bookworm (security)       1.0.18-1+deb12u1 fixed\n                   trixie (security), trixie 1.0.18-1+deb13u1 fixed\n                   forky, sid                1.0.18-2         fixed\n\n   The information below is based on the following data on fixed versions.\n\n    Package   Type   Release    Fixed Version   Urgency   Origin   Debian Bugs\n   libsodium source bullseye   1.0.18-1+deb11u1         DLA-4435-1\n   libsodium source bookworm   1.0.18-1+deb12u1         DSA-6094-1\n   libsodium source trixie     1.0.18-1+deb13u1         DSA-6094-1\n   libsodium source (unstable) 1.0.18-2                            1124374\n\nNotes\n\nhttps://00f.net/2025/12/30/libsodium-vulnerability/\nFixed by: https://github.com/jedisct1/libsodium/commit/ad3004ec8731730e93fcfbbc8\n24e67eadc1c1bae\n     __________________________________________________________________"
+        },
+        {
+          "name": "Debian security advisory",
+          "source_type": "web_text",
+          "url": "https://security-tracker.debian.org/tracker/DSA-6094-1",
+          "retrieved_at": "2026-04-03T04:27:15.992Z",
+          "text": "DSA-6094-1\n\n   Name        DSA-6094-1\n   Description libsodium - security update\n   Source      Debian\n   References  CVE-2025-69277\n\nVulnerable and fixed packages\n\n   The table below lists information on source packages.\n\n   Source Package           Release              Version        Status\n   libsodium (PTS) bookworm                  1.0.18-1         vulnerable\n                   bookworm (security)       1.0.18-1+deb12u1 fixed\n                   trixie (security), trixie 1.0.18-1+deb13u1 fixed\n\n   The information below is based on the following data on fixed versions.\n\n    Package   Type  Release   Fixed Version   Urgency Origin Debian Bugs\n   libsodium source bookworm 1.0.18-1+deb12u1\n   libsodium source trixie   1.0.18-1+deb13u1\n     __________________________________________________________________"
+        },
+        {
+          "name": "Debian LTS advisory",
+          "source_type": "web_text",
+          "url": "https://security-tracker.debian.org/tracker/DLA-4435-1",
+          "retrieved_at": "2026-04-03T04:27:15.992Z",
+          "text": "DLA-4435-1\n\n   Name        DLA-4435-1\n   Description libsodium - security update\n   Source      Debian LTS\n   References  CVE-2025-69277\n\nVulnerable and fixed packages\n\n   The table below lists information on source packages.\n\n   Source Package        Release           Version        Status\n   libsodium (PTS) bullseye            1.0.18-1         vulnerable\n                   bullseye (security) 1.0.18-1+deb11u1 fixed\n\n   The information below is based on the following data on fixed versions.\n\n    Package   Type  Release   Fixed Version   Urgency Origin Debian Bugs\n   libsodium source bullseye 1.0.18-1+deb11u1\n     __________________________________________________________________"
+        },
+        {
+          "name": "Upstream disclosure",
+          "source_type": "web_text",
+          "url": "https://00f.net/2025/12/30/libsodium-vulnerability/",
+          "retrieved_at": "2026-04-03T04:27:15.992Z",
+          "text": "A vulnerability in libsodium\n\n   December 30, 2025\n\n   Libsodium is now 13 years old!\n\n   I started that project to pursue Dan Bernstein’s desire to make\n   cryptography simple to use. That meant exposing a limited set of\n   high-level functions and parameters, providing a simple API, and\n   writing documentation for users, not cryptographers. Libsodium’s goal\n   was to expose APIs to perform operations, not low-level functions.\n   Users shouldn’t even have to know or care about what algorithms are\n   used internally. This is how I’ve always viewed libsodium.\n\n   Never breaking the APIs is also something I’m obsessed with. APIs may\n   not be great, and if I could start over from scratch, I would have made\n   them very different, but as a developer, the best APIs are not the most\n   beautifully designed ones, but the ones that you don’t have to worry\n   about because they don’t change and upgrades don’t require any changes\n   in your application either. Libsodium started from the NaCl API, and\n   still adheres to it.\n\n   These APIs exposed high-level functions, but also some lower-level\n   functions that high-level functions wrap or depend on. Over the years,\n   people started using these low-level functions directly. Libsodium\n   started to be used as a toolkit of algorithms and low-level primitives.\n\n   That made me sad, especially since it is clearly documented that only\n   APIs from builds with --enable-minimal are guaranteed to be tested and\n   stable. But after all, it makes sense. When building custom protocols,\n   having a single portable library with a consistent interface for\n   different functions is far better than importing multiple dependencies,\n   each with their own APIs and sometimes incompatibilities between them.\n\n   That’s a lot of code to maintain. It includes features and target\n   platforms I don’t use but try to support for the community. I also\n   maintain a large number of other open source projects.\n\n   Still, the security track record of libsodium is pretty good, with zero\n   CVEs in 13 years even though it has gotten a lot of scrutiny.\n\n   However, while recently experimenting with adding support for batch\n   signatures, I noticed inconsistent results with code originally written\n   in Zig. The culprit was a check that was present in a function in Zig,\n   but that I forgot to add in libsodium.\n\nThe bug\n\n   The function crypto_core_ed25519_is_valid_point(), a low-level function\n   used to check if a given elliptic curve point is valid, was supposed to\n   reject points that aren’t in the main cryptographic group, but some\n   points were slipping through.\n\nWhy does this matter?\n\n   Edwards25519 is like a special mathematical playground where\n   cryptographic operations happen.\n\n   It is used internally for Ed25519 signatures, and includes multiple\n   subgroups of different sizes (order):\n     * Order 1: just the identity (0, 1)\n     * Order 2: identity + point (0, -1)\n     * Order 4: 4 points\n     * Order 8: 8 points\n     * Order L: the “main subgroup” (L = ~2^252 points) where all\n       operations are expected to happen\n     * Order 2L, 4L, 8L: very large, but not prime order subgroups\n\n   The validation function was designed to reject points not in the main\n   subgroup. It properly rejected points in the small-order subgroups, but\n   not points in the mixed-order subgroups.\n\nWhat went wrong technically?\n\n   To check if a point is in the main subgroup (the one of order L), the\n   function multiplies it by L. If the order is L, multiplying any point\n   by L gives the identity point (the mathematical equivalent of zero).\n   So, the code does the multiplication and checks that we ended up with\n   the identity point.\n\n   Points are represented by coordinates. In the internal representation\n   used here, there are three coordinates: X, Y, and Z. The identity point\n   is represented internally with coordinates where X = 0 and Y = Z. Z can\n   be anything depending on previous operations; it doesn’t have to be 1.\n\n   The old code only checked X = 0. It forgot to verify Y = Z. This meant\n   some invalid points (where X = 0 but Y ≠ Z after the multiplication)\n   were incorrectly accepted as valid.\n\n   Concretely: take any main-subgroup point Q (for example, the output of\n   crypto_core_ed25519_random) and add the order-2 point (0, -1), or\n   equivalently negate both coordinates. Every such Q + (0, -1) would have\n   passed validation before the fix, even though it’s not in the main\n   subgroup.\n\nThe fix\n\n   The fix is trivial and adds the missing check:\n// OLD:\nreturn fe25519_iszero(pl.X);\n\n// NEW:\nfe25519_sub(t, pl.Y, pl.Z);\nreturn fe25519_iszero(pl.X) & fe25519_iszero(t);\n\n   Now it properly verifies both conditions: X must be zero and Y must\n   equal Z.\n\nWho is affected?\n\n   You may be affected if you:\n     * Use a point release <= 1.0.20 or a version of libsodium released\n       before December 30, 2025.\n     * Use crypto_core_ed25519_is_valid_point() to validate points from\n       untrusted sources\n     * Implement custom cryptography using arithmetic over the\n       Edwards25519 curve\n\n   But don’t panic. Most users are not affected.\n\n   None of the high-level APIs (crypto_sign_*) are affected; they don’t\n   even use or need that function. Scalar multiplication using\n   crypto_scalarmult_ed25519 won’t leak anything even if the public key is\n   not on the main subgroup. And public keys created with the regular\n   crypto_sign_keypair and crypto_sign_seed_keypair functions are\n   guaranteed to be on the correct subgroup.\n\nRecommendation\n\n   Support for the Ristretto255 group was added to libsodium in 2019\n   specifically to solve cofactor-related issues. With Ristretto255, if a\n   point decodes, it’s safe. No further validation is required.\n\n   If you implement custom cryptographic schemes doing arithmetic over a\n   finite field group, using Ristretto255 is recommended. It’s easier to\n   use, and as a bonus, low-level operations will run faster than over\n   Edwards25519.\n\n   If you can’t update libsodium and need an application-level workaround,\n   use the following function:\nint is_on_main_subgroup(const unsigned char p[crypto_core_ed25519_BYTES])\n{\n    /* l - 1 (group order minus 1) */\n    static const unsigned char L_1[crypto_core_ed25519_SCALARBYTES] = {\n        0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58,\n        0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10\n    };\n    /* Identity point encoding: (x=0, y=1) */\n    static const unsigned char ID[crypto_core_ed25519_BYTES] = {\n        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00\n    };\n    unsigned char t[crypto_core_ed25519_BYTES];\n    unsigned char r[crypto_core_ed25519_BYTES];\n    if (crypto_scalarmult_ed25519_noclamp(t, L_1, p) != 0 ||\n        crypto_core_ed25519_add(r, t, p) != 0) {\n        return 0;\n    }\n    return sodium_memcmp(r, ID, sizeof ID) == 0;\n}\n\nFixed packages\n\n   This issue was fixed immediately after discovery. All stable packages\n   released after December 30, 2025 include the fix:\n     * official tarballs\n     * binaries for Visual Studio\n     * binaries for MingW\n     * NuGet packages for all architectures including Android\n     * swift-sodium xcframework (but swift-sodium doesn’t expose low-level\n       functions anyway)\n     * rust libsodium-sys-stable\n     * libsodium.js\n\n   A new point release is also going to be tagged.\n\n   If libsodium is useful to you, please keep in mind that it is\n   maintained by one person, for free, in time I could spend with my\n   family or on other projects. The best way to help the project would be\n   to consider sponsoring it, which helps me dedicate more time to\n   improving it and making it great for everyone, for many more years to\n   come."
+        }
+      ],
+      "local_repo_context": [
+        {
+          "name": "Ubuntu/Debian changelog entry in this source tree",
+          "source_type": "local_file",
+          "path": "original/debian/changelog",
+          "text": "libsodium (1.0.18-1ubuntu0.24.04.1) noble-security; urgency=medium\n\n  * SECURITY UPDATE: mishandled check in crypto_core_ed25519_is_valid_point\n    - debian/patches/CVE-2025-69277.patch: check Y==Z in addition to X==0\n      in src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c,\n      test/default/core_ed25519.c.\n    - CVE-2025-69277\n\n -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Tue, 06 Jan 2026 11:06:40 -0500"
+        },
+        {
+          "name": "Debian patch series in this source tree",
+          "source_type": "local_file",
+          "path": "original/debian/patches/series",
+          "text": "CVE-2025-69277.patch"
+        },
+        {
+          "name": "Debian packaged patch in this source tree",
+          "source_type": "local_file",
+          "path": "original/debian/patches/CVE-2025-69277.patch",
+          "text": "From ad3004ec8731730e93fcfbbc824e67eadc1c1bae Mon Sep 17 00:00:00 2001\nFrom: Frank Denis <github@pureftpd.org>\nDate: Mon, 29 Dec 2025 23:22:15 +0100\nSubject: [PATCH] core_ed25519_is_valid_point: check Y==Z in addition to X==0\n\n---\n src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c | 5 ++++-\n test/default/core_ed25519.c                             | 7 ++++++-\n 2 files changed, 10 insertions(+), 2 deletions(-)\n\ndiff --git a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c\nindex d3020132a1..4b824f6d94 100644\n--- a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c\n+++ b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c\n@@ -992,10 +992,13 @@ int\n ge25519_is_on_main_subgroup(const ge25519_p3 *p)\n {\n     ge25519_p3 pl;\n+    fe25519    t;\n \n     ge25519_mul_l(&pl, p);\n \n-    return fe25519_iszero(pl.X);\n+    fe25519_sub(t, pl.Y, pl.Z);\n+\n+    return fe25519_iszero(pl.X) & fe25519_iszero(t);\n }\n \n int\ndiff --git a/test/default/core_ed25519.c b/test/default/core_ed25519.c\nindex bc45749391..02f72bd681 100644\n--- a/test/default/core_ed25519.c\n+++ b/test/default/core_ed25519.c\n@@ -13,6 +13,10 @@ static const unsigned char max_canonical\n     0xe4, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,\n     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f\n };\n+static const unsigned char not_main_subgroup_p[32] = {\n+    0x95, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99,\n+    0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99\n+};\n \n static void\n add_P(unsigned char * const S)\n@@ -130,11 +134,12 @@ main(void)\n     assert(crypto_core_ed25519_is_valid_point(p) == 0);\n \n     p[0] = 9;\n-    assert(crypto_core_ed25519_is_valid_point(p) == 1);\n+    assert(crypto_core_ed25519_is_valid_point(p) == 0);\n \n     assert(crypto_core_ed25519_is_valid_point(max_canonical_p) == 1);\n     assert(crypto_core_ed25519_is_valid_point(non_canonical_invalid_p) == 0);\n     assert(crypto_core_ed25519_is_valid_point(non_canonical_p) == 0);\n+    assert(crypto_core_ed25519_is_valid_point(not_main_subgroup_p) == 0);\n \n     memcpy(p2, p, crypto_core_ed25519_BYTES);\n     add_P(p2);"
+        }
+      ]
+    }
+  ]
+}
