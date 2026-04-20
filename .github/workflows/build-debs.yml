@@ -40,6 +40,7 @@ jobs:
             automake \
             build-essential \
             ca-certificates \
+            curl \
             devscripts \
             dpkg-dev \
             equivs \
@@ -51,6 +52,10 @@ jobs:
             python3 \
             rsync \
             xz-utils
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+          source "$HOME/.cargo/env"
+          rustc --version
+          cargo --version
           (
             cd original
             if [ -f Makefile ]; then
