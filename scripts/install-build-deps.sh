@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# Install apt packages and a stable rust toolchain for libsodium's safe
-# build. autoconf/automake/libtool are required to autoreconf the
-# upstream tree before the safe build consumes its outputs.
+# Install apt packages and a rust toolchain for libsodium's safe build.
+# autoconf/automake/libtool are required to autoreconf the upstream tree.
 set -euo pipefail
 
-export DEBIAN_FRONTEND=noninteractive
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
+toolchain="${SAFELIBS_RUST_TOOLCHAIN:-}"
+if [[ -z "$toolchain" && -f "$repo_root/safe/rust-toolchain.toml" ]]; then
+  toolchain="$(grep -oP '^channel\s*=\s*"\K[^"]+' "$repo_root/safe/rust-toolchain.toml" || true)"
+fi
+toolchain="${toolchain:-stable}"
+
+export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
   autoconf \
@@ -26,11 +32,11 @@ sudo apt-get install -y --no-install-recommends \
   xz-utils
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-  | sh -s -- -y --profile minimal --default-toolchain stable --no-modify-path
+  | sh -s -- -y --profile minimal --default-toolchain "$toolchain" --no-modify-path
 
 # shellcheck source=/dev/null
 . "$HOME/.cargo/env"
-rustup default stable
+rustup default "$toolchain"
 rustc --version
 cargo --version
 
